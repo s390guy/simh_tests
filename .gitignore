@@ -1,0 +1,22 @@
+# PLEASE NOTE:
+
+# There is no need to add temporary files here when adding a new source
+# file as such files (including .dll and .so) are caught by the general
+# rules at the end of this file.
+
+# The only thing you need to add is an executable without extension.
+
+# /
+.directory
+
+# /hello/
+/hello/__pycache__
+/hello/.directory
+
+# Python
+*.pyc
+
+# Editors
+*.backup
+*.py~
+*~
