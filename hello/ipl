@@ -34,5 +34,5 @@ TEST=${HOME}/simh/simh_tests/hello
 STARTUP=${TEST}/hello.ini      # Simulator start up file
 
 echo "at the SimH prompt type: boot cdr0"
-echo "to exit the simulator type: quit
+echo "to exit the simulator type: quit"
 ${SIMH} ${STARTUP}
