@@ -92,19 +92,19 @@ PGMSTART BALR  12,0            Establish my base register
 * Determine if the device, subchannel and channel are ready for use.
          LH    1,CONDEV    Set up I/O device address in I/O instruction register
          TIO   0(1)        Determine if the console is there
-         BC    B'0100',DEVNOAVL  ..No, CC=1 might have a different config address
+         BC    B'0001',DEVNOAVL  ..No, CC=3 might have a different config address
          BC    B'0010',DEVBUSY   ..No, CC=2 console device or channel is busy
-         BC    B'0001',DEVCSW    ..No, CC=3 CSW stored in ASA at X'40'
+         BC    B'0100',DEVCSW    ..No, CC=1 CSW stored in ASA at X'40'
 * Console device is available (CC=0)!
          SPACE 1
 * Prepare for I/O to console
-         MVC   CAW(8),CCWADDR    Identify in ASA where first CCW resides
+         MVC   CAW(4),CCWADDR    Identify in ASA where first CCW resides
          SPACE 1
 * Send the Hello World message to the console
          SIO   0(1)        Request console channel program to start, did it?
-         BC    B'0100',DEVNOAVL  ..No, CC=1 don't know why, but tell someone.
+         BC    B'0001',DEVNOAVL  ..No, CC=3 don't know why, but tell someone.
          BC    B'0010',DEVBUSY   ..No, CC=2 console device or channel is busy
-         BC    B'0001',DEVCSW    ..No, CC=3 CSW stored in ASA at X'40'
+         BC    B'0100',DEVCSW    ..No, CC=1 CSW stored in ASA at X'40'
 * Console device is now receiving the message (CC=0)
          SPACE 1
 * Wait for an I/O interruption
@@ -127,7 +127,7 @@ IODONE   EQU   *          The bare-metal program continues here after I/O
          BNO   DOWAIT              Wait again for both to be done
 * Both channel and unit have ended
          SPACE 1
-* HURRAY!  Program 3 delivered its Hello World message!
+* HURRAY!  HELLO delivered its Hello World message!
          LPSW  DONE      Normal program termination
          SPACE 1
 * End the bare-metal program with an error indicated in PSW
@@ -137,9 +137,6 @@ DEVCSW   LPSW  CSWSTR    Code 00C End because CSW stored in ASA
 DEVUNKN  LPSW  NOTCON    Code 010 End unexpected device caused I/O interruption
 CHNLERR  LPSW  CHERROR   Code 014 End because console channel error occurred
 UNITERR  LPSW  DVERROR   Code 018 End because console device error occurred
-         SPACE 1
-* Control Register 2 - Enables channels for interruptions
-CR2      DC    XL4'80000000'  Enable only channel 0 where console is connected
          SPACE 1
 * I/O related information
 CCWADDR  DC    A(CONCCW) Address of first CCW to be executed by console device.
