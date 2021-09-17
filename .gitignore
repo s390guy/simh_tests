@@ -9,6 +9,10 @@
 # /
 .directory
 
+# /crd2consl/
+/crd2consl/__pycache__
+/crd2consl/.directory
+
 # /hello/
 /hello/__pycache__
 /hello/.directory

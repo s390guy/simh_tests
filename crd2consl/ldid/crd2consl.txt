@@ -1,0 +1,2 @@
+ASAREGN.bin 0x0
+CRD2CSL.bin 0x2000

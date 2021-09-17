@@ -1,0 +1,37 @@
+#!/bin/sh
+# Copyright 2021 Harold Grovesteen
+#
+# MIT License:
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+
+# This script uses the simple Python program makecrd.py to create a binary
+# file that can be combined with the IPL deck for reading by the IPL'd program.
+
+SATK=${HOME}/SATKREPO/SATK
+DECK=${SATK}/tools/deck.py
+BLDIR=${HOME}/simh/simh_tests/crd2consl
+
+# Create the single card read by the IPL program
+MAKECRD=./makecrd.py
+${MAKECRD} testcard.card
+
+# Combine the IPL program and the single card into one deck
+export DECKS=${BLDIR}
+${DECK} --card ${DECKS}/crd2consl.ipl crd2consl.deck testcard.card

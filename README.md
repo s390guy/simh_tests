@@ -14,7 +14,8 @@ simh-tests use the tools provided by Stand Alone Tool Kit, [SATK](http://github.
 
 ## simH 360 Tests
 
-    hello   A stand-alone program sending a Hello World message to the console.
+    hello      A stand-alone program sending a Hello World message to the console.
+    crd2consl  Read a card from the IPL stream and send it to the console.
 
 ## Directory Content
 
