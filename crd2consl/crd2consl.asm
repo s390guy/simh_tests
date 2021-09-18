@@ -34,7 +34,7 @@
 * Target Architecture: S/360
 *
 * Devices Used:
-*   00C - IPL card reader
+*   10C - IPL card reader
 *   01F - Console device
 *
 * Program Register Usage:
@@ -95,6 +95,9 @@ PGMSECT  START X'2000',CRD2CSL Start a second region for the program itself
 PGMSTART BALR  12,0            Establish my base register
          USING *,12            Tell the assembler
          SPACE 1
+         LH    1,2         Get the card reader device address (stored by IPL)
+* Do this before bytes 2 and 3 are overlayed by the restart trap PSW.
+         SPACE 1
 * Ensure program is not re-entered by a Hercules console initiated restart.
 * Address 0 changed from its absolute storage role (IPL PSW) to its real
 * storage role (Restart New PSW) after the IPL.
@@ -105,13 +108,12 @@ PGMSTART BALR  12,0            Establish my base register
 * No need to validate that the IPL device is present.  The fact that this
 * program got loaded and is executing proves the reader device is present and
 * working.
-         LH    1,RDRDEV    Get the card reader device's address
          MVC   CAW(4),RCCWADDR   Identify the IPL device CCW to be executed
          SIO   0(1)        Request the reader channel program to start, did it?
          BC    B'0001',RNOAVL  ..No, CC=3 don't know why, but tell someone.
          BC    B'0010',RBUSY   ..No, CC=2 console device or channel is busy
          BC    B'0100',RCSW    ..No, CC=1 CSW stored in ASA at X'40'
-* Reader device is now sending the card contents (CC=0)
+* Reader device is now sending the card's contents (CC=0)
 * Wait for an I/O interruption
 RDRWAIT  BAL   15,DOWAIT       WAIT FOR I/O interrupt
          SPACE 1
@@ -192,7 +194,6 @@ RUNTERR  LPSW  RDVERROR  Code 018 End because reader device error occurred
 CCWADDR  DC    A(CONCCW) Address of first CCW to be executed by console device.
 RCCWADDR DC    A(RDRCCW) Address of first CCW to be executed by reader device.
 CONDEV   DC    XL2'001F'   Console device address
-RDRDEV   DC    XL2'000C'   Reader device address
 STATUS   DC    XL2'0000'   Used to accumulate unit and channel status
          SPACE 1
 * CCW used by the program to write the card contents to the console
@@ -209,7 +210,7 @@ RDRCCW   CCW   X'02',RIOAREA,0,L'RIOAREA    Read the card into memory
          SPACE 1
 * PSW's used by the bare-metal program
 PGMRS    DWAIT CODE=008     Restart New PSW trap.  Points to Restart Old PSW
-WAIT     PSW360 X'80',0,2,0,0    Causes CPU to wait for I/O interruption
+WAIT     PSW360 X'F8',0,2,0,0    Causes CPU to wait for I/O interruption
 CONT     PSW360 0,0,0,0,IODONE   Causes the CPU to continue after waiting
 IOTRAP   PSW360 0,0,2,0,X'38'    I/O trap New PSW (restored after I/O)
          SPACE 1

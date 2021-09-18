@@ -30,10 +30,9 @@ datetime   # set $sfx (the date and time of the run) for later use
 # Change this variable for your environment
 SIMHREPO=${HOME}/simh/simhrepo       # simh location directory
 SIMH=${SIMHREPO}/BIN/ibm360          # simh simulator
-#TEST=${HOME}/simh/simh_tests/crd2consl
-TEST=${HOME}/SATKWIP/tests/simh/crd2consl
+TEST=${HOME}/simh/simh_tests/crd2consl  # Test directory
 STARTUP=${TEST}/crd2consl.ini        # Simulator start up file
 
-echo "at the SimH prompt type: boot cdr0"
+echo "at the SimH prompt type: boot cdr2"
 echo "to exit the simulator type: quit"
 ${SIMH} ${STARTUP}
