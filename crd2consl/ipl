@@ -33,6 +33,6 @@ SIMH=${SIMHREPO}/BIN/ibm360          # simh simulator
 TEST=${HOME}/simh/simh_tests/crd2consl  # Test directory
 STARTUP=${TEST}/crd2consl.ini        # Simulator start up file
 
-echo "at the SimH prompt type: boot cdr2"
+echo "at the SimH prompt type: boot cdr0"
 echo "to exit the simulator type: quit"
 ${SIMH} ${STARTUP}
