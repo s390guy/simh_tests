@@ -1,0 +1,701 @@
+ASMA Ver. 0.2.1                                                                                     24 Sep 2021 09:40:22  Page     1
+
+ LOC       OBJECT CODE      ADDR1   ADDR2   STMT
+
+                                               1 * Copyright 2021 Harold Grovesteen
+                                               2 *
+                                               3 * MIT License:
+                                               4 *
+                                               5 * Permission is hereby granted, free of charge, to any person obtaining a copy
+                                               6 * of this software and associated documentation files (the "Software"), to deal
+                                               7 * in the Software without restriction, including without limitation the rights
+                                               8 * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+                                               9 * copies of the Software, and to permit persons to whom the Software is
+                                              10 * furnished to do so, subject to the following conditions:
+                                              11 *
+                                              12 * The above copyright notice and this permission notice shall be included in
+                                              13 * all copies or substantial portions of the Software.
+                                              14 *
+                                              15 * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+                                              16 * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+                                              17 * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+                                              18 * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+                                              19 * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+                                              20 * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+                                              21 * THE SOFTWARE.
+                                              22
+ASMA Ver. 0.2.1  CRD2CONSL - SEND CARD CONTENTS TO CONSOLE                                          24 Sep 2021 09:40:22  Page     2
+
+ LOC       OBJECT CODE      ADDR1   ADDR2   STMT
+
+                                              24 * Program Description:
+                                              25 *
+                                              26 * CRD2CONSL is a bare-metal program.  It requires input/output commands to
+                                              27 * the IPL card stream to read a card's contents and then send the card's
+                                              28 * contents to the consolde device.
+                                              29 *
+                                              30 * The program is executed by means of an IPL from a card deck containing as
+                                              31 * the last card the one that is sent to the console.  The card contains
+                                              32 * EBCDIC data and is part of the IPL deck.
+                                              33 *
+                                              34 * Target Architecture: S/360
+                                              35 *
+                                              36 * Devices Used:
+                                              37 *   10C - IPL card reader
+                                              38 *   01F - Console device
+                                              39 *
+                                              40 * Program Register Usage:
+                                              41 *
+                                              42 *   R0   Base register for access to the ASA.  Required by DSECT usage
+                                              43 *   R1   Device Channel and Unit Address for I/O instructions
+                                              44 *   R11  Contains zero for STATUS clearing (zero from CPU reset).
+                                              45 *   R12  The program base register
+                                              46 *   R15  Subroutine return register
+                                              47 *
+                                              48 * Disabled Wait State PSW's address field values used by the program:
+                                              49 *    X'000000' - Successful execution of the program
+                                              50 *    X'000008' - Unexpected Restart interruption occurred. Old Restart PSW at
+                                              51 *                address X'8'
+                                              52 *    X'000018' - Unexpected External interruption occurred.  Old External PSW at
+                                              53 *                address X'18'
+                                              54 *    X'000020' - Unexpected Supervisor interruption occurred.  Old Supervisor
+                                              55 *                PSW at address X'20'
+                                              56 *    X'000028' - Unexpected Program interruption occurred. Old Program PSW at
+                                              57 *                address X'28'
+                                              58 *    X'000030' - Unexpected Machine Check interruption occurred.  Old Machine
+                                              59 *                Check PSW at address X'30'
+                                              60 *    X'000038' - Unexpected Input/Output interruption occurred.  Old Input/Output
+                                              61 *                PSW at address X'38'
+                                              62 *    X'010004' - Console Device X'01F' or channel not operational
+                                              63 *    X'010008' - Console Device X'01F' or channel busy
+                                              64 *    X'01000C' - Console Device X'01F' or channel had a problem. See CSW.
+                                              65 *    X'010010' - Unexpected interruption from some other device. See ASA X'BA'
+                                              66 *    X'010014' - Console channel error occurred
+                                              67 *    X'010018' - Console device did not complete the I/O without a problem
+                                              68 *    X'020004' - Reader Device X'00C' or channel not operational
+                                              69 *    X'020008' - Reader Device X'00C' or channel busy
+                                              70 *    X'02000C' - Reader Device X'00C' or channel had a problem. See CSW.
+                                              71 *    X'020010' - Not used
+                                              72 *    X'020014' - Reader channel error occurred
+                                              73 *    X'020018' - Reader device did not complete the I/O without a problem
+ASMA Ver. 0.2.1  CRD2CONSL - SEND CARD CONTENTS TO CONSOLE                                          24 Sep 2021 09:40:22  Page     3
+
+ LOC       OBJECT CODE      ADDR1   ADDR2   STMT
+
+                                              75 * See all object data and macro generated model statements in the listing
+                                              76          PRINT DATA,GEN
+
+                                              78 * Inform the SATK macros of the architecture being targeted.  Inferred from
+                                              79 * the ASMA -t command-line argument.
+                                              80          ARCHLVL
+                                              82+$AL      OPSYN AL
+                                              83+$ALR     OPSYN ALR
+                                              84+$B       OPSYN B
+                                              85+$BC      OPSYN BC
+                                              86+$BCTR    OPSYN BCTR
+                                              87+$BE      OPSYN BE
+                                              88+$BH      OPSYN BH
+                                              89+$BL      OPSYN BL
+                                              90+$BM      OPSYN BM
+                                              91+$BNE     OPSYN BNE
+                                              92+$BNH     OPSYN BNH
+                                              93+$BNL     OPSYN BNL
+                                              94+$BNM     OPSYN BNM
+                                              95+$BNO     OPSYN BNO
+                                              96+$BNP     OPSYN BNP
+                                              97+$BNZ     OPSYN BNZ
+                                              98+$BO      OPSYN BO
+                                              99+$BP      OPSYN BP
+                                             100+$BXLE    OPSYN BXLE
+                                             101+$BZ      OPSYN BZ
+                                             102+$CH      OPSYN CH
+                                             103+$CLR     OPSYN CLR
+                                             104+$L       OPSYN L
+                                             105+$LH      OPSYN LH
+                                             106+$LM      OPSYN LM
+                                             107+$LNR     OPSYN LNR
+                                             108+$LPSW    OPSYN LPSW
+                                             109+$LR      OPSYN LR
+                                             110+$LTR     OPSYN LTR
+                                             111+$NR      OPSYN NR
+                                             112+$SL      OPSYN SL
+                                             113+$SLR     OPSYN SLR
+                                             114+$SR      OPSYN SR
+                                             115+$ST      OPSYN ST
+                                             116+$STM     OPSYN STM
+                                             117+$X       OPSYN X
+                                             118+$BAS     OPSYN BAL
+                                             119+$BASR    OPSYN BALR
+                                             120+         MNOTE *,'ARCHLVL - ARCHITECTURE LEVEL SET - 1'
+        ** [120] MNOTE *,ARCHLVL - ARCHITECTURE LEVEL SET - 1
+                                             121 * Ensure interrupt traps are loaded by iplasma.py before program execution
+                                             122 * begins.  This macro will create the memory region that will also contain
+                                             123 * the IPL PSW.  The region name defaults to ASAREGN.  iplasma.py knows how
+                                             124 * to deal with this situation.
+                                             125 ASASECT  ASALOAD
+                            000000  0001FF   126+ASASECT  START 0,ASAREGN
+ASMA Ver. 0.2.1  CRD2CONSL - SEND CARD CONTENTS TO CONSOLE                                          24 Sep 2021 09:40:22  Page     4
+
+ LOC       OBJECT CODE      ADDR1   ADDR2   STMT
+
+000000  00020000 00000008                    128+         PSW   0,0,2,0,X'008'      64-bit Restart ISR Trap New PSW
+000008                      000008  000058   129+         ORG   ASASECT+X'058'
+000058  00020000 00000018                    131+         PSW   0,0,2,0,X'018'      64-bit External ISR Trap New PSW
+000060  00020000 00000020                    132+         PSW   0,0,2,0,X'020'      64-bit Supervisor Call ISR Trap New PSW
+000068  00020000 00000028                    133+         PSW   0,0,2,0,X'028'      64-bit Program ISR Trap New PSW
+000070  00020000 00000030                    134+         PSW   0,0,2,0,X'030'      64-bit Machine Check Trap New PSW
+000078  00020000 00000038                    135+         PSW   0,0,2,0,X'038'      64-bit Input/Output Trap New PSW
+000080                      000080  000200   136+         ORG   ASASECT+512
+                                             137          ASAIPL IA=PGMSTART    Define the bare-metal program's IPL PSW
+                            000000  0001FF   138+ASASECT  CSECT
+000200                      000200  000000   139+         ORG   ASASECT
+000000  00000000 00002000                    140+         PSW   0,0,0,0,PGMSTART,24
+000008                      000008  000200   141+         ORG   ASASECT+512      Reset CSECT to end of assigned storage area
+                            000000  0001FF   142+ASASECT  CSECT
+
+
+                                             144 *
+                                             145 * The Bare-Metal Hello World Program
+                                             146 *
+
+                            002000  002187   148 PGMSECT  START X'2000',CRD2CSL Start a second region for the program itself
+                                             149 * This results in CRD2CSL.bin being created in the list directed IPL directory
+002000                      000000           150          USING ASA,0           Give me instruction access to the ASA CSECT
+002000  05C0                                 151 PGMSTART BALR  12,0            Establish my base register
+002002                      002002           152          USING *,12            Tell the assembler
+
+002002  4810 0002                   000002   154          LH    1,2         Get the card reader device address (stored by IPL)
+                                             155 * Do this before bytes 2 and 3 are overlayed by the restart trap PSW.
+
+                                             157 * Ensure program is not re-entered by a Hercules console initiated restart.
+                                             158 * Address 0 changed from its absolute storage role (IPL PSW) to its real
+                                             159 * storage role (Restart New PSW) after the IPL.
+                                             160 * Change from the IPL PSW at address 0 to Restart New PSW trap
+002006  D207 0000 C106      000000  002108   161          MVC   RSTNPSW,PGMRS
+
+
+
+                                             163 * Most systems pass control to the CPU following receipt of CE and DE from
+                                             164 * the IPL device.  On some systems, the transfer occurs upon receipt of
+                                             165 * CE allowing the device to later supply the DE.  The following code is
+                                             166 * used to effect the same wait for DE that usually happens by the hardware
+                                             167 * executing the IPL function.
+00200C  9D00 1000                   000000   168 IPLWAIT  TIO   0(1)     Request the IPL device status
+002010  4710 C0D4                   0020D6   169          BC    B'0001',RNOAVL  If CC=3, device unavailable.  Tell someone.
+                                             170 * IF CC=2 or 1, busy or CSW stored, wait until the device is available.
+                                             171 * The assumption is that the CSW contains the DE that the program is waiting
+                                             172 * to see.  The program does not really care about the received status.
+                                             173 * It is just looking for the IPL device to be available.
+002014  4760 C00A                   00200C   174          BC    B'0110',IPLWAIT
+                                             175 * CC=0, available, allows the program to continue.
+
+                                             177 * Note: For systems the do NOT transfer control to the CPU until DE IS
+ASMA Ver. 0.2.1  CRD2CONSL - SEND CARD CONTENTS TO CONSOLE                                          24 Sep 2021 09:40:22  Page     5
+
+ LOC       OBJECT CODE      ADDR1   ADDR2   STMT
+
+                                             178 * received, the above sequence will return CC=0 on the first TIO and proceed
+                                             179 * into the program as it would normally.
+
+
+
+                                             181 * Read a card from the IPL device
+                                             182 * No need to validate that the IPL device is present.  The fact that this
+                                             183 * program got loaded and is executing proves the reader device is present and
+                                             184 * working.
+002018  D203 0048 C0EE              0020F0   185          MVC   CAW(4),RCCWADDR   Identify the IPL device CCW to be executed
+00201E  9C00 1000                   000000   186          SIO   0(1)        Request the reader channel program to start, did it?
+002022  4710 C0D4                   0020D6   187          BC    B'0001',RNOAVL  ..No, CC=3 don't know why, but tell someone.
+002026  4720 C0D8                   0020DA   188          BC    B'0010',RBUSY   ..No, CC=2 console device or channel is busy
+00202A  4740 C0DC                   0020DE   189          BC    B'0100',RCSW    ..No, CC=1 CSW stored in ASA at X'40'
+                                             190 * Reader device is now sending the card's contents (CC=0)
+                                             191 * Wait for an I/O interruption
+00202E  45F0 C0A2                   0020A4   192 RDRWAIT  BAL   15,DOWAIT       WAIT FOR I/O interrupt
+
+                                             194 * I/O results can now be checked.
+                                             195 *   Yes, check the CSW conditions to determine if the console I/O worked
+002032  D601 C0F4 0044      0020F6  000044   196          OC    STATUS,CSW+4        Accummulate Device and Channel status
+002038  9500 C0F5                   0020F7   197          CLI   STATUS+1,X'00'      Did the channel have, a problem?
+00203C  4770 C0E0                   0020E2   198          BNE   RCHLERR             ..Yes, end with a reader channel error
+002040  91F3 C0F4                   0020F6   199          TM    STATUS,X'F3'        Did the unit encounter a problem?
+002044  4770 C0E4                   0020E6   200          BNZ   RUNTERR             ..No, end with a unit error
+002048  910C C0F4                   0020F6   201          TM    STATUS,X'0C'        Did both channel and unit end?
+00204C  47E0 C02C                   00202E   202          BNO   RDRWAIT             Wait again for both to be done
+                                             203 * CARD HAS BEEN SUCCESSFULLY READ!
+
+
+
+                                             205 * Determine if the console device, subchannel and channel are ready for use.
+002050  4810 C0F2                   0020F4   206          LH    1,CONDEV    Set up I/O device address in I/O instruction register
+002054  9D00 1000                   000000   207          TIO   0(1)        Determine if the console is there
+002058  4710 C0BC                   0020BE   208          BC    B'0001',DEVNOAVL  ..No, CC=3 might have a different config address
+00205C  4720 C0C0                   0020C2   209          BC    B'0010',DEVBUSY   ..No, CC=2 console device or channel is busy
+002060  4740 C0C4                   0020C6   210          BC    B'0100',DEVCSW    ..No, CC=1 CSW stored in ASA at X'40'
+                                             211 * Console device is available (CC=0)!
+
+                                             213 * Prepare for I/O to console
+002064  40B0 C0F4                   0020F6   214          STH   11,STATUS         Clear status for console I/O operation
+002068  D203 0048 C0EA              0020EC   215          MVC   CAW(4),CCWADDR    Identify in ASA where first CCW resides
+
+                                             217 * Send the Hello World message to the console
+00206E  9C00 1000                   000000   218          SIO   0(1)        Request console channel program to start, did it?
+002072  4710 C0BC                   0020BE   219          BC    B'0001',DEVNOAVL  ..No, CC=3 don't know why, but tell someone.
+002076  4720 C0C0                   0020C2   220          BC    B'0010',DEVBUSY   ..No, CC=2 console device or channel is busy
+00207A  4740 C0C4                   0020C6   221          BC    B'0100',DEVCSW    ..No, CC=1 CSW stored in ASA at X'40'
+                                             222 * Console device is now receiving the card contents (CC=0)
+
+                                             224 * Wait for an I/O interruption
+00207E  45F0 C0A2                   0020A4   225 CONWAIT  BAL   15,DOWAIT
+ASMA Ver. 0.2.1  CRD2CONSL - SEND CARD CONTENTS TO CONSOLE                                          24 Sep 2021 09:40:22  Page     6
+
+ LOC       OBJECT CODE      ADDR1   ADDR2   STMT
+
+
+                                             227 * I/O results can now be checked.
+                                             228 *   Yes, check the CSW conditions to determine if the console I/O worked
+002082  D601 C0F4 0044      0020F6  000044   229          OC    STATUS,CSW+4        Accummulate Device and Channel status
+002088  9500 C0F5                   0020F7   230          CLI   STATUS+1,X'00'      Did the channel have, a problem?
+00208C  4770 C0CC                   0020CE   231          BNE   CHNLERR             ..Yes, end with a channel error
+002090  91F3 C0F4                   0020F6   232          TM    STATUS,X'F3'        Did the unit encounter a problem?
+002094  4770 C0D0                   0020D2   233          BNZ   UNITERR             ..No, end with a unit error
+002098  910C C0F4                   0020F6   234          TM    STATUS,X'0C'        Did both channel and unit end?
+00209C  47E0 C07C                   00207E   235          BNO   CONWAIT              Wait again for both to be done
+                                             236 * Both channel and unit have ended
+
+                                             238 * HURRAY!  CARD CONTENTS HAVE BEEN SENT TO THE CONSOLE!
+0020A0  8200 C126                   002128   239          LPSW  DONE      Normal program termination
+
+
+
+                                             241 *
+                                             242 * I/O WAIT SUBROUTINE
+                                             243 *
+0020A4  D207 0078 C116              002118   244 DOWAIT   MVC   IONPSW(8),CONT  Set up continuation PSW for after I/O interrupt
+0020AA  8200 C10E                   002110   245          LPSW  WAIT       Wait for I/O interruption and CSW from channel
+                            0020AE  000001   246 IODONE   EQU   *          The bare-metal program continues here after I/O
+0020AE  D207 0078 C11E              002120   247          MVC   IONPSW(8),IOTRAP     Restore I/O trap PSW
+                                             248 *   Did the interruption come from the expected device?
+0020B4  4910 003A                   00003A   249          CH    1,IOOPSW+2          Is the interrupt from the expected device?
+0020B8  078F                                 250          BER   15                  ..Yes, return to caller
+0020BA  47F0 C0C8                   0020CA   251          B     DEVUNKN             ..No, end program with an error
+
+
+
+                                             253 * End the bare-metal program with an error indicated in PSW
+0020BE  8200 C12E                   002130   254 DEVNOAVL LPSW  NODEV     Code 004 End console device is not available
+0020C2  8200 C136                   002138   255 DEVBUSY  LPSW  BUSYDEV   Code 008 End because device is busy (no wait)
+0020C6  8200 C13E                   002140   256 DEVCSW   LPSW  CSWSTR    Code 00C End because CSW stored in ASA
+0020CA  8200 C146                   002148   257 DEVUNKN  LPSW  NOTCON    Code 010 End unexpected device caused I/O interruption
+0020CE  8200 C14E                   002150   258 CHNLERR  LPSW  CHERROR   Code 014 End because console channel error occurred
+0020D2  8200 C156                   002158   259 UNITERR  LPSW  DVERROR   Code 018 End because console device error occurred
+0020D6  8200 C15E                   002160   260 RNOAVL   LPSW  RNODEV    Code 004 End reader device is not available
+0020DA  8200 C166                   002168   261 RBUSY    LPSW  RBUSYDEV  Code 008 End because reader device is busy (no wait)
+0020DE  8200 C16E                   002170   262 RCSW     LPSW  RCSWSTR   Code 00C End because CSW stored in ASA for reader
+                                             263 *RUNKN    LPSW  RNOTCON   Code 010 End unexpected device caused I/O interruption
+0020E2  8200 C176                   002178   264 RCHLERR  LPSW  RCHERROR  Code 014 End because reader channel error occurred
+0020E6  8200 C17E                   002180   265 RUNTERR  LPSW  RDVERROR  Code 018 End because reader device error occurred
+
+                                             267 * I/O related information
+0020EC  000020F8                             268 CCWADDR  DC    A(CONCCW) Address of first CCW to be executed by console device.
+0020F0  00002100                             269 RCCWADDR DC    A(RDRCCW) Address of first CCW to be executed by reader device.
+0020F4  001F                                 270 CONDEV   DC    XL2'001F'   Console device address
+0020F6  0000                                 271 STATUS   DC    XL2'0000'   Used to accumulate unit and channel status
+
+                                             273 * CCW used by the program to write the card contents to the console
+ASMA Ver. 0.2.1  CRD2CONSL - SEND CARD CONTENTS TO CONSOLE                                          24 Sep 2021 09:40:22  Page     7
+
+ LOC       OBJECT CODE      ADDR1   ADDR2   STMT
+
+0020F8  09002188 00000050                    274 CONCCW   CCW0  X'09',RIOAREA,0,L'RIOAREA     Write card to console with CR
+                                             275 *         CCW0  X'03',0,0,1                   ..then a NOP.
+                                             276 * If the preceding NOP CCW command is enabled, then the CONCCW must set
+                                             277 * command chaining in the flag byte, setting the third operand to X'40'
+
+                                             279 * CCW used to read the card from the IPL device stream on X'00C'
+002100  02002188 00000050                    280 RDRCCW   CCW   X'02',RIOAREA,0,L'RIOAREA    Read the card into memory
+                                             281 *         CCW0  X'03',0,0,1                   ..then a NOP.
+                                             282 * If the preceding NOP CCW command is enabled, then the RDRCW must set
+                                             283 * command chaining in the flag byte, setting the third operand to X'40'
+
+                                             285 * PSW's used by the bare-metal program
+                                             286 PGMRS    DWAIT CODE=008     Restart New PSW trap.  Points to Restart Old PSW
+002108  00020000 00010008                    287+PGMRS    PSW   0,0,2,0,X'010008'
+002110  F8020000 00000000                    288 WAIT     PSW360 X'F8',0,2,0,0    Causes CPU to wait for I/O interruption
+002118  00000000 000020AE                    289 CONT     PSW360 0,0,0,0,IODONE   Causes the CPU to continue after waiting
+002120  00020000 00000038                    290 IOTRAP   PSW360 0,0,2,0,X'38'    I/O trap New PSW (restored after I/O)
+
+                                             292 * PSW's terminating program execution
+                                             293 DONE     DWAITEND              Successful execution of the program
+002128  00020000 00000000                    295+DONE     PSW   0,0,2,0,X'000000'
+                                             296 NODEV    DWAIT PGM=01,CMP=0,CODE=004  Console device not available
+002130  00020000 00010004                    297+NODEV    PSW   0,0,2,0,X'010004'
+                                             298 BUSYDEV  DWAIT PGM=01,CMP=0,CODE=008  Console device busy
+002138  00020000 00010008                    299+BUSYDEV  PSW   0,0,2,0,X'010008'
+                                             300 CSWSTR   DWAIT PGM=01,CMP=0,CODE=00C  CSW stored in ASA
+002140  00020000 0001000C                    301+CSWSTR   PSW   0,0,2,0,X'01000C'
+                                             302 NOTCON   DWAIT PGM=01,CMP=0,CODE=010  Unexpected interruption from other device
+002148  00020000 00010010                    303+NOTCON   PSW   0,0,2,0,X'010010'
+                                             304 CHERROR  DWAIT PGM=01,CMP=0,CODE=014  Console channel error occurred
+002150  00020000 00010014                    305+CHERROR  PSW   0,0,2,0,X'010014'
+                                             306 DVERROR  DWAIT PGM=01,CMP=0,CODE=018  Console device error occurred
+002158  00020000 00010018                    307+DVERROR  PSW   0,0,2,0,X'010018'
+                                             308 RNODEV   DWAIT PGM=02,CMP=0,CODE=004  Reader device not available
+002160  00020000 00020004                    309+RNODEV   PSW   0,0,2,0,X'020004'
+                                             310 RBUSYDEV DWAIT PGM=02,CMP=0,CODE=008  Reader device busy
+002168  00020000 00020008                    311+RBUSYDEV PSW   0,0,2,0,X'020008'
+                                             312 RCSWSTR  DWAIT PGM=02,CMP=0,CODE=00C  CSW stored in ASA
+002170  00020000 0002000C                    313+RCSWSTR  PSW   0,0,2,0,X'02000C'
+                                             314 *RNOTCON DWAIT PGM=02,CMP=0,CODE=010  Unexpected interruption from other device
+                                             315 RCHERROR DWAIT PGM=02,CMP=0,CODE=014  Reader channel error occurred
+002178  00020000 00020014                    316+RCHERROR PSW   0,0,2,0,X'020014'
+                                             317 RDVERROR DWAIT PGM=02,CMP=0,CODE=018  Reader device error occurred
+002180  00020000 00020018                    318+RDVERROR PSW   0,0,2,0,X'020018'
+
+
+
+                                             320 * No constants should be placed below this area.  Base register not needed
+                                             321 * because this area is only referenced by CCW's
+002188                                       322 RIOAREA  DS    0CL80
+                                             323 * Note: the 0 ensures no space is reserved in IPL deck for this area.
+ASMA Ver. 0.2.1  CRD2CONSL - SEND CARD CONTENTS TO CONSOLE                                          24 Sep 2021 09:40:22  Page     8
+
+ LOC       OBJECT CODE      ADDR1   ADDR2   STMT
+
+                                             325 *
+                                             326 * Hardware Assigned Storage Locations
+                                             327 *
+
+                                             329 * This DSECT allows symbolic access to these locations.  The DSECT created is
+                                             330 * named ASA.
+                                             331 ASA      ASAREA DSECT=YES
+                                             332+ASA      DSECT
+                            000000  000001   333+ASBEGIN  EQU   *                   Start of absolute/real assigned storage areas
+000000  00000000 00000000                    334+IPLPSW   DC    FD'0'        000 A  Initial Program Load Program Status Word
+000008  00000000 00000000                    335+IPLCCW1  DC    FD'0'        008 A  Initial Program Load first Channel Command Word
+000010  00000000 00000000                    336+IPLCCW2  DC    FD'0'        010 A  Initial program Load second Channel Command Word
+                                             337+* RESTART RELATED PROGRAM STATUS WORDS
+000018                      000018  000000   338+         ORG   ASBEGIN
+000000  00000000 00000000                    339+RSTNPSW  DC    FD'0'        000 R  Restart New PSW
+000008  00000000 00000000                    340+RSTOPSW  DC    FD'0'        008 R  Restart Old PSW
+000010  00000000 00000000                    341+UA0      DC    FD'0'        010 R  Unassigned Area 0
+                                             342+* INTERRUPTION OLD PROGRAM STATUS WORD SAVE AREAS
+000018  00000000 00000000                    343+EXTOPSW  DC    FD'0'        018 R  External Interrupt Old PSW
+000020  00000000 00000000                    344+SVCOPSW  DC    FD'0'        020 R  Supervisor Call Old PSW
+000028  00000000 00000000                    345+PGMOPSW  DC    FD'0'        028 R  Program Old PSW
+000030  00000000 00000000                    346+MCKOPSW  DC    FD'0'        030 R  Machine Check Old PSW
+000038  00000000 00000000                    347+IOOPSW   DC    FD'0'        038 R  Input/Output Old PSW
+                                             348+* System/360 or System/370 Basic Control Mode INTERRUPTION INFORMATION
+000040                      000040  00001A   349+         ORG   EXTOPSW+2
+00001A  0000                                 350+BCEXTCOD DC    H'0'         01A R  External Interuption Code
+00001C                      00001C  000022   351+         ORG   SVCOPSW+2
+000022  0000                                 352+BCSVCCOD DC    H'00'        022 R  Supervisor Call Interruption Code
+000024                      000024  00002A   353+         ORG   PGMOPSW+2
+00002A  0000                                 354+BCPGMCOD DC    H'0'         02A R  Program Interruption Code
+00002C                      00002C  000032   355+         ORG   MCKOPSW+2
+000032  0000                                 356+BCMCKCOD DC    H'0'         032 R  Machine Check Interruption Code
+000034                      000034  00003A   357+         ORG   IOOPSW+2
+00003A  0000                                 358+BCIOCOD  DC    H'0'         03A R  Input/Output Interruption Code (Device CCUU)
+00003C                      00003C  000040   359+         ORG   *+4
+                                             360+* CHANNEL-BASED INPUT/OUTPUT INTERRUPT RELATED
+000040  00000000 00000000                    361+CSW      DC    FD'0'        040 R  Channel Status Word
+000048                                       362+CAW      DC    0F'0'        048 R  Channel Address Word
+000048  00                                   363+CAWKEY   DC    X'00'        048 R  Channel Storage Key (bits 0-3)
+                            000008  000001   364+CAWSUSP  EQU   X'08'        048 R  Suspend Control (bit 4)
+000049  000000                               365+CAWADDR  DC    AL3(0)       049 R  Channel Command Address
+00004C  00000000                             366+UA1      DC    F'0'         04C R  Unassigend Area 1
+                                             367+* MISCELANEOUS AREAS
+000050  00000000                             368+TIMER    DC    F'0'         050 R  System/360 and System/370 Interval Timer
+000054  00000000                             369+TTDES    DC    F'0'         054 R  System/370 Trace-Table-Designation
+                                             370+* INTERRUPTION NEW PROGRAM STATUS WORD AREAS
+000058                      000058  000058   371+         ORG   ASBEGIN+X'58'
+000058  00000000 00000000                    372+EXTNPSW  DC    FD'0'        058 R  External New PSW
+000060  00000000 00000000                    373+SVCNPSW  DC    FD'0'        060 R  Supervisor Call New PSW
+000068  00000000 00000000                    374+PGMNPSW  DC    FD'0'        068 R  Program New PSW
+000070  00000000 00000000                    375+MCKNPSW  DC    FD'0'        070 R  Machine Check New PSW
+000078  00000000 00000000                    376+IONPSW   DC    FD'0'        078 R  Input/Output New PSW
+ASMA Ver. 0.2.1  CRD2CONSL - SEND CARD CONTENTS TO CONSOLE                                          24 Sep 2021 09:40:22  Page     9
+
+ LOC       OBJECT CODE      ADDR1   ADDR2   STMT
+
+                                             377+* System/360 Diagnostic Scanout Area
+000080                                       378+SCANOUT  DS    0X           080 A  System/360 Diagnostic Scanout Area
+                            000000  000001   379+SCANOUTL EQU   *-SCANOUT           System/360 Diagnostic Scanout Area Length
+                                             380+* EXTERNAL INTERRUPTION INFORMATION
+000080                      000080  000080   381+         ORG   ASBEGIN+X'80'
+000080  00000000                             382+EXTIPARM DC    F'0'         080 R  External-interruption Parameter
+000084  0000                                 383+EXTCPUAD DC    H'0'         084 R  External-interruption CPU Address
+000086  0000                                 384+EXTICODE DC    H'0'         086 R  External-interruption Code
+                                             385+* SUPERVISOR CALL INTERRUPTION INFORMATION
+000088                                       386+SVCIID   DC    0F'0'        088 R  Supervisor-Call Interuption Identification
+000088  00                                   387+         DC    X'00'        088 R  not-used - zeros stored
+000089  00                                   388+SVCIILC  DC    X'00'        089 R  Supervisor-Call instruction length code
+                            00000C  000001   389+SVCIILCM EQU   B'00001100'         Supervisor-Call ILC mask, zeros stored in other bits
+00008A  0000                                 390+SVCICODE DC    H'0'         08A R  Supervisor-Call Interruption Code
+                                             391+* PROGRAM INTERRUPTION INFORMATION
+00008C                                       392+PGMIID   DC    0F'0'        08C R  Program-interruption identification
+00008C  00                                   393+         DC    X'00'        08C R  not-used - zeros stored
+00008D  00                                   394+PGMIILC  DC    X'00'        08D R  Program instruction lengh code
+                            00000C  000001   395+PGMIILCM EQU   B'00001100'         Progrtam ILC mask, zeros stored in other bits
+00008E  0000                                 396+PGMICODE DC    H'0'         08E R  Program Interruption Code
+000090                                       397+PGMDXC   DC    0F'0'        090 R  Data-Exception Code
+000090  00000000                             398+PGMTRX   DC    F'0'         090 R  Translation-Exception Identification
+000094                                       399+MONCLS   DC    0H'0'        094 R  Monitor-Class Number
+000094  00                                   400+         DC    X'00'        094 R  not-used - zeros stored
+000095  00                                   401+MONNUMBR DC    X'00'        095 R  Monitor-Class Number stored
+000096  00                                   402+PERCODE  DC    X'00'        096 R  Program-Event-Recording Code
+                            0000F0  000001   403+PERCODMK EQU   B'11110000'         Program-Event-Recordind Code mask in bits 0-3
+000097  00                                   404+         DC    X'00'        097 R  PER Code not used - zeros stored
+000098  00000000                             405+PERADDR  DC    F'0'         098 R  PER Address
+00009C  00000000                             406+MONCODE  DC    F'0'         09C R  Monitor Event Code in bytes 1-3, zeros in byte 0
+0000A0  00                                   407+PGMACCID DC    X'00'        0A0 R  Exception access identification
+0000A1  00                                   408+PERACCID DC    X'00'        0A1 R  PER access identification
+0000A2  00                                   409+MPGACCID DC    X'00'        0A2 R  MOVE PAGE Operand access identification
+0000A3                                       410+SSARCHMD DC    0X'00'       0A3 A  Store Status Architectural Mode Identification
+0000A3  00                                   411+MKARCHMD DC    X'00'        0A3 R  Machine-Check Architectural Mode Identification
+0000A4  00000000                             412+UA2      DC    F'0'         0A4 R  Unused area
+                                             413+* System/370 CHANNEL INPUT/OUTPUT INFORMATION
+0000A8                      0000A8  0000A8   414+         ORG   ASBEGIN+X'A8'
+0000A8  00000000                             415+CHANID   DC    F'0'         0A8 R  System/370 STORE CHANNEL ID location
+0000AC  00000000                             416+IOELADDR DC    F'0'         0AC R  System/370 I/O Extended Logout Address
+0000B0  00000000                             417+LCHANLOG DC    F'0'         0B0 R  System/370 Limited Channel Logout Area
+0000B4  00000000                             418+UA3      DC    F'0'         0B4 R  unused by System/370
+0000B8  00                                   419+UA4      DC    X'00'        0B8 R  unused by System/370
+0000B9  00                                   420+MEASUREB DC    X'00'        0B9 R  System/370 Measurement Byte
+0000BA  0000                                 421+IOICODE  DC    H'0'         0BA R  System/370 Input/Output Interruption Device Address
+                                             422+* MACHINE-CHECK INTERRUPTION INFORMATION
+0000BC                      0000BC  0000D4   423+         ORG   ASBEGIN+X'D4'
+0000D4  00000000                             424+MKXSAA   DC    F'0'         0D4 R  Machine-Check Extended Save Area Address
+0000D8  00000000 00000000                    425+MKCPUTIM DC    FD'0'        0D8 R  Machine-Check CPU timer save area
+0000E0  00000000 00000000                    426+MKCLKCMP DC    FD'0'        0E0 R  Machine-Check clock comparator save area
+0000E8  00000000                             427+MKICODE  DC    F'0'         0E8 R  Machine-Check interruption code
+0000EC  00000000 00000000                    428+UA6      DC    XL8'00'      0EC R  unused area
+ASMA Ver. 0.2.1  CRD2CONSL - SEND CARD CONTENTS TO CONSOLE                                          24 Sep 2021 09:40:22  Page    10
+
+ LOC       OBJECT CODE      ADDR1   ADDR2   STMT
+
+0000F4  00000000                             429+MKDMGCOD DC    F'0'         0F4 R  Machine-Check external damage code
+0000F8                                       430+ZMKFAILA DC    0FD'0'       0F8 R  Machine-Check failing storage address
+0000F8  00000000                             431+MKFAILA  DC    F'0'         0F8 R  Machine-Check failing storage address
+0000FC  00000000                             432+MKMODEL  DC    F'0'         0FC R  Machine-Check model dependent information
+000100  00000000 00000000                    433+MKLOGOUT DC    4F'0'        100 R  ESA machine-check fixed logout area
+000108  00000000 00000000
+000110                      000110  000120   434+         ORG   ASBEGIN+X'120'
+000120  00000000 00000000                    435+MKARS    DC    16F'0'       120 R  Machine-Check access register save area
+000128  00000000 00000000
+000130  00000000 00000000
+000138  00000000 00000000
+000140  00000000 00000000
+000148  00000000 00000000
+000150  00000000 00000000
+000158  00000000 00000000
+                            000160  000001   436+ASEND    EQU   *                   End of absolute/real assigned storage areas
+                            000160  000001   437+ASLENGTH EQU   ASEND-ASBEGIN       Length of absolute/real assigned storage area
+                                             438          END
+ASMA Ver. 0.2.1  CRD2CONSL - SEND CARD CONTENTS TO CONSOLE                                          24 Sep 2021 09:40:22  Page    11
+
+     SYMBOL        TYPE  VALUE   LENGTH  DEFN  REFERENCES
+
+ASA                 4    000000     352   332  150
+ASAREGN             2    000000     512   126
+ASASECT             J    000000     512   126  129  136  139  141
+ASBEGIN             U    000000       1   333  338  371  381  414  423  434  437
+ASEND               U    000160       1   436  437
+ASLENGTH            U    000160       1   437
+BCEXTCOD            H    00001A       2   350
+BCIOCOD             H    00003A       2   358
+BCMCKCOD            H    000032       2   356
+BCPGMCOD            H    00002A       2   354
+BCSVCCOD            H    000022       2   352
+BUSYDEV             3    002138       8   299  255
+CAW                 F    000048       4   362  185  215
+CAWADDR             R    000049       3   365
+CAWKEY              X    000048       1   363
+CAWSUSP             U    000008       1   364
+CCWADDR             A    0020EC       4   268  215
+CHANID              F    0000A8       4   415
+CHERROR             3    002150       8   305  258
+CHNLERR             I    0020CE       4   258  231
+CONCCW              W    0020F8       8   274  268
+CONDEV              X    0020F4       2   270  206
+CONT                3    002118       8   289  244
+CONWAIT             I    00207E       4   225  235
+CRD2CSL             2    002000     392   148
+CSW                 F    000040       8   361  196  229
+CSWSTR              3    002140       8   301  256
+DEVBUSY             I    0020C2       4   255  209  220
+DEVCSW              I    0020C6       4   256  210  221
+DEVNOAVL            I    0020BE       4   254  208  219
+DEVUNKN             I    0020CA       4   257  251
+DONE                3    002128       8   295  239
+DOWAIT              I    0020A4       6   244  192  225
+DVERROR             3    002158       8   307  259
+EXTCPUAD            H    000084       2   383
+EXTICODE            H    000086       2   384
+EXTIPARM            F    000080       4   382
+EXTNPSW             F    000058       8   372
+EXTOPSW             F    000018       8   343  349
+IMAGE               1    000000     904     0
+IODONE              U    0020AE       1   246  289
+IOELADDR            F    0000AC       4   416
+IOICODE             H    0000BA       2   421
+IONPSW              F    000078       8   376  244  247
+IOOPSW              F    000038       8   347  357  249
+IOTRAP              3    002120       8   290  247
+IPLCCW1             F    000008       8   335
+IPLCCW2             F    000010       8   336
+IPLPSW              F    000000       8   334
+IPLWAIT             I    00200C       4   168  174
+LCHANLOG            F    0000B0       4   417
+MCKNPSW             F    000070       8   375
+ASMA Ver. 0.2.1  CRD2CONSL - SEND CARD CONTENTS TO CONSOLE                                          24 Sep 2021 09:40:22  Page    12
+
+     SYMBOL        TYPE  VALUE   LENGTH  DEFN  REFERENCES
+
+MCKOPSW             F    000030       8   346  355
+MEASUREB            X    0000B9       1   420
+MKARCHMD            X    0000A3       1   411
+MKARS               F    000120       4   435
+MKCLKCMP            F    0000E0       8   426
+MKCPUTIM            F    0000D8       8   425
+MKDMGCOD            F    0000F4       4   429
+MKFAILA             F    0000F8       4   431
+MKICODE             F    0000E8       4   427
+MKLOGOUT            F    000100       4   433
+MKMODEL             F    0000FC       4   432
+MKXSAA              F    0000D4       4   424
+MONCLS              H    000094       2   399
+MONCODE             F    00009C       4   406
+MONNUMBR            X    000095       1   401
+MPGACCID            X    0000A2       1   409
+NODEV               3    002130       8   297  254
+NOTCON              3    002148       8   303  257
+PERACCID            X    0000A1       1   408
+PERADDR             F    000098       4   405
+PERCODE             X    000096       1   402
+PERCODMK            U    0000F0       1   403
+PGMACCID            X    0000A0       1   407
+PGMDXC              F    000090       4   397
+PGMICODE            H    00008E       2   396
+PGMIID              F    00008C       4   392
+PGMIILC             X    00008D       1   394
+PGMIILCM            U    00000C       1   395
+PGMNPSW             F    000068       8   374
+PGMOPSW             F    000028       8   345  353
+PGMRS               3    002108       8   287  161
+PGMSECT             J    002000     392   148
+PGMSTART            I    002000       2   151  140
+PGMTRX              F    000090       4   398
+RBUSY               I    0020DA       4   261  188
+RBUSYDEV            3    002168       8   311  261
+RCCWADDR            A    0020F0       4   269  185
+RCHERROR            3    002178       8   316  264
+RCHLERR             I    0020E2       4   264  198
+RCSW                I    0020DE       4   262  189
+RCSWSTR             3    002170       8   313  262
+RDRCCW              W    002100       8   280  269
+RDRWAIT             I    00202E       4   192  202
+RDVERROR            3    002180       8   318  265
+RIOAREA             C    002188      80   322  274  280
+RNOAVL              I    0020D6       4   260  169  187
+RNODEV              3    002160       8   309  260
+RSTNPSW             F    000000       8   339  161
+RSTOPSW             F    000008       8   340
+RUNTERR             I    0020E6       4   265  200
+SCANOUT             X    000080       1   378  379
+SCANOUTL            U    000000       1   379
+ASMA Ver. 0.2.1  CRD2CONSL - SEND CARD CONTENTS TO CONSOLE                                          24 Sep 2021 09:40:22  Page    13
+
+     SYMBOL        TYPE  VALUE   LENGTH  DEFN  REFERENCES
+
+SSARCHMD            X    0000A3       1   410
+STATUS              X    0020F6       2   271  196  197  199  201  214  229  230  232  234
+SVCICODE            H    00008A       2   390
+SVCIID              F    000088       4   386
+SVCIILC             X    000089       1   388
+SVCIILCM            U    00000C       1   389
+SVCNPSW             F    000060       8   373
+SVCOPSW             F    000020       8   344  351
+TIMER               F    000050       4   368
+TTDES               F    000054       4   369
+UA0                 F    000010       8   341
+UA1                 F    00004C       4   366
+UA2                 F    0000A4       4   412
+UA3                 F    0000B4       4   418
+UA4                 X    0000B8       1   419
+UA6                 X    0000EC       8   428
+UNITERR             I    0020D2       4   259  233
+WAIT                3    002110       8   288  245
+ZMKFAILA            F    0000F8       8   430
+ASMA Ver. 0.2.1  CRD2CONSL - SEND CARD CONTENTS TO CONSOLE                                          24 Sep 2021 09:40:22  Page    14
+
+ MACRO     DEFN  REFERENCES
+
+ARCHIND      81
+ARCHLVL      80
+ASAIPL      137
+ASALOAD     125
+ASAREA      331
+DWAIT       286   294   296   298   300   302   304   306   308   310   312   315   317
+DWAITEND    293
+TRAP64      127   130
+ASMA Ver. 0.2.1  CRD2CONSL - SEND CARD CONTENTS TO CONSOLE                                          24 Sep 2021 09:40:22  Page    15
+
+   DESC     SYMBOL  SIZE    POS       ADDR
+
+Entry: 0
+
+Image      IMAGE     904  000-387  0000-0387
+  Region   ASAREGN   512  000-1FF  0000-01FF
+    CSECT  ASASECT   512  000-1FF  0000-01FF
+  Region   CRD2CSL   392  200-387  2000-2187
+    CSECT  PGMSECT   392  200-387  2000-2187
+
+
+ ADDR    POS                                OBJECT CONTENT                                         CHARACTER CONTENT
+
+
+Region: ASAREGN
+
+000000   000   00000000 00002000 00000000 00000000  00000000 00000000 00000000 00000000   |................ ................|
+000020   020   00000000 00000000 00000000 00000000  00000000 00000000 00000000 00000000   |................ ................|
+000040   040   00000000 00000000 00000000 00000000  00000000 00000000 00020000 00000018   |................ ................|
+000060   060   00020000 00000020 00020000 00000028  00020000 00000030 00020000 00000038   |................ ................|
+000080   080   00000000 00000000 00000000 00000000  00000000 00000000 00000000 00000000   |................ ................|
+0000A0   0A0   00000000 00000000 00000000 00000000  00000000 00000000 00000000 00000000   |................ ................|
+0000C0   0C0   00000000 00000000 00000000 00000000  00000000 00000000 00000000 00000000   |................ ................|
+0000E0   0E0   00000000 00000000 00000000 00000000  00000000 00000000 00000000 00000000   |................ ................|
+000100   100   00000000 00000000 00000000 00000000  00000000 00000000 00000000 00000000   |................ ................|
+000120   120   00000000 00000000 00000000 00000000  00000000 00000000 00000000 00000000   |................ ................|
+000140   140   00000000 00000000 00000000 00000000  00000000 00000000 00000000 00000000   |................ ................|
+000160   160   00000000 00000000 00000000 00000000  00000000 00000000 00000000 00000000   |................ ................|
+000180   180   00000000 00000000 00000000 00000000  00000000 00000000 00000000 00000000   |................ ................|
+0001A0   1A0   00000000 00000000 00000000 00000000  00000000 00000000 00000000 00000000   |................ ................|
+0001C0   1C0   00000000 00000000 00000000 00000000  00000000 00000000 00000000 00000000   |................ ................|
+0001E0   1E0   00000000 00000000 00000000 00000000  00000000 00000000 00000000 00000000   |................ ................|
+
+Region: CRD2CSL
+
+002000   200   05C04810 0002D207 0000C106 9D001000  4710C0D4 4760C00A D2030048 C0EE9C00   |......K...A..... ...M.-..K.......|
+002020   220   10004710 C0D44720 C0D84740 C0DC45F0  C0A2D601 C0F40044 9500C0F5 4770C0E0   |.....M...Q. ...0 .sO..4..n..5....|
+002040   240   91F3C0F4 4770C0E4 910CC0F4 47E0C02C  4810C0F2 9D001000 4710C0BC 4720C0C0   |j3.4...Uj..4.... ...2............|
+002060   260   4740C0C4 40B0C0F4 D2030048 C0EA9C00  10004710 C0BC4720 C0C04740 C0C445F0   |. .D ..4K....... ........... .D.0|
+002080   280   C0A2D601 C0F40044 9500C0F5 4770C0CC  91F3C0F4 4770C0D0 910CC0F4 47E0C07C   |.sO..4..n..5.... j3.4....j..4...@|
+0020A0   2A0   8200C126 D2070078 C1168200 C10ED207  0078C11E 4910003A 078F47F0 C0C88200   |b.A.K...A.b.A.K. ..A........0.Hb.|
+0020C0   2C0   C12E8200 C1368200 C13E8200 C1468200  C14E8200 C1568200 C15E8200 C1668200   |A.b.A.b.A.b.A.b. A+b.A.b.A;b.A.b.|
+0020E0   2E0   C16E8200 C1768200 C17E0000 000020F8  00002100 001F0000 09002188 00000050   |A>b.A.b.A=.....8 ...........h...&|
+002100   300   02002188 00000050 00020000 00010008  F8020000 00000000 00000000 000020AE   |...h...&........ 8...............|
+002120   320   00020000 00000038 00020000 00000000  00020000 00010004 00020000 00010008   |................ ................|
+002140   340   00020000 0001000C 00020000 00010010  00020000 00010014 00020000 00010018   |................ ................|
+002160   360   00020000 00020004 00020000 00020008  00020000 0002000C 00020000 00020014   |................ ................|
+002180   380   00020000 00020018                                                          |........                         |
+ASMA Ver. 0.2.1  CRD2CONSL - SEND CARD CONTENTS TO CONSOLE                                          24 Sep 2021 09:40:22  Page    16
+
+   STMT                       FILE NAME
+
+1     /home/harold/simh/simh_tests/crd2consl/crd2consl.asm
+
+
+** NO ERRORS FOUND **
+
+[120] MNOTE *,ARCHLVL - ARCHITECTURE LEVEL SET - 1
+

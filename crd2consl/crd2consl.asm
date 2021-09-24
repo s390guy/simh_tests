@@ -104,6 +104,24 @@ PGMSTART BALR  12,0            Establish my base register
 * Change from the IPL PSW at address 0 to Restart New PSW trap
          MVC   RSTNPSW,PGMRS
          SPACE 3
+* Most systems pass control to the CPU following receipt of CE and DE from
+* the IPL device.  On some systems, the transfer occurs upon receipt of
+* CE allowing the device to later supply the DE.  The following code is
+* used to effect the same wait for DE that usually happens by the hardware
+* executing the IPL function.
+IPLWAIT  TIO   0(1)     Request the IPL device status
+         BC    B'0001',RNOAVL  If CC=3, device unavailable.  Tell someone.
+* IF CC=2 or 1, busy or CSW stored, wait until the device is available.
+* The assumption is that the CSW contains the DE that the program is waiting
+* to see.  The program does not really care about the received status.  
+* It is just looking for the IPL device to be available.
+         BC    B'0110',IPLWAIT
+* CC=0, available, allows the program to continue.
+         SPACE 1
+* Note: For systems the do NOT transfer control to the CPU until DE IS
+* received, the above sequence will return CC=0 on the first TIO and proceed
+* into the program as it would normally.
+         SPACE 3
 * Read a card from the IPL device
 * No need to validate that the IPL device is present.  The fact that this
 * program got loaded and is executing proves the reader device is present and
