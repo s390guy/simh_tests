@@ -50,14 +50,14 @@ R0       EQU   0   Base register for access to the ASA. Required by DSECT
 *                  usage, but available for program usage
 R1       EQU   1   Device Channel and Unit Address for I/O instructions
 R2       EQU   2   I/O Routine Channel-Address Word
-R3       EQU   3   available
+R3       EQU   3   Length of data received from the operator
 R4       EQU   4   available
 R5       EQU   5   available
 R6       EQU   6   available
 R7       EQU   7   available
 R8       EQU   8   available
 R9       EQU   9   available
-R10      EQU   10
+R10      EQU   10  available
 R11      EQU   11  Contains zero for STATUS clearing (zero'd from CPU reset).
 R12      EQU   12  The global program base register
 R13      EQU   13  available
@@ -159,14 +159,38 @@ CKQUIT   DS    0H   Check if operator entered quit
          CLC   QUIT,DATA         Did operator enter quit
          BE    FINISH            ..Yes, end the program.
          SPACE 1
-* No, need to echo input data - TODO
-         B     ECHOLOOP
-         B     FINISH            Program done
-         
+*
+* No, echo operator's input data on the console
+*
+         MVI   PGMRTN,ECHODATA   Displaying the query..
+         STH   R11,STATUS        Clear status for console I/O operation
+         STH   R3,PUTLEN         Update the CCW with the actual output length
+         LA    R2,PUTDATA        Locate the initial CCW
+         ST    R2,CAW            Tell the I/O request its address in ASA
+         SIO   0(R1)       Request console channel program to start, did it?
+         BC    B'0001',DEVNOAVL  ..No, CC=3 don't know why, but tell someone.
+         BC    B'0010',DEVBUSY   ..No, CC=2 console device or channel is busy
+         BC    B'0100',CSWSTRD   ..No, CC=1 CSW stored in ASA at X'40'
+* Transfer initiated (CC=0)...
+POLL2    TIO   0(R1)             Test the I/O progress.
+         BC    B'0010',POLL2     CC=2, data still being sent, cont. polling
+         BC    B'0001',DEVNOAVL  CC=3 don't know why, but tell someone.
+         BC    B'1000',NOCSW     CC=0 missed CSW, don't know why abort
+* CSW stored (CC=1), analyze for result.
+         OC    STATUS,CSW+4      Accummulate Device and Channel status
+         CLI   STATUS+1,X'00'    Did the channel have a problem?
+         BNE   CSWACCUM          ..Yes, end with a device/channel error
+* Test for abnormal status for a console device (see above for details)
+         TM    STATUS,X'42'      Was a device error reported?
+         BNZ   CSWACCUM          ..Yes, end with a device/channel error
+         TM    STATUS,X'04'      Device finally done?
+         BNO   POLL2             ..No, continue waiting for device end
+         B     ECHOLOOP          ..Yes, get operator's next output
          SPACE 3
 * Program position used in building abend address
 INIT     EQU   X'00'        Program initialization
 HEADER   EQU   X'01'        Operator prompt and input retrieved
+ECHODATA EQU   X'02'        Echoing data from the operator
 PGMRTN   DC    AL1(INIT)    Initialize program position data
          SPACE 3
 *
@@ -183,6 +207,11 @@ GETDATA  CCW   X'01',ENTER,X'40',L'ENTER   Display 'ENTER: ' on console
 *              Command-chain (X'40') to the next CCW
          CCW   X'0A',DATA,X'20',L'DATA     Read operator's data
 *              Suppress Incorrect Length Indicator - operator's data varies
+         SPACE 1
+PUTDATA  CCW   X'09',DATA,0,0              Echo operator's data
+         ORG   PUTDATA+6
+PUTLEN   DS    HL2                         Echo'd data's length
+         SPACE 1
 INLEN    DC    Y(L'DATA)     Input data length (Could also use prev. CCW)
 QUITLEN  DC    Y(L'QUIT)     Length of quit literal
          SPACE 1

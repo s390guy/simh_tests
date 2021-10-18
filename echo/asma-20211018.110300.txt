@@ -1,0 +1,848 @@
+ASMA Ver. 0.2.1                                                                                     18 Oct 2021 11:03:00  Page     1
+
+ LOC       OBJECT CODE      ADDR1   ADDR2   STMT
+
+                                               1 * Copyright 2021 Harold Grovesteen
+                                               2 *
+                                               3 * MIT License:
+                                               4 *
+                                               5 * Permission is hereby granted, free of charge, to any person obtaining a copy
+                                               6 * of this software and associated documentation files (the "Software"), to deal
+                                               7 * in the Software without restriction, including without limitation the rights
+                                               8 * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+                                               9 * copies of the Software, and to permit persons to whom the Software is
+                                              10 * furnished to do so, subject to the following conditions:
+                                              11 *
+                                              12 * The above copyright notice and this permission notice shall be included in
+                                              13 * all copies or substantial portions of the Software.
+                                              14 *
+                                              15 * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+                                              16 * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+                                              17 * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+                                              18 * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+                                              19 * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+                                              20 * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+                                              21 * THE SOFTWARE.
+                                              22
+ASMA Ver. 0.2.1  ECHO - CONSOLE ECHO TEST                                                           18 Oct 2021 11:03:00  Page     2
+
+ LOC       OBJECT CODE      ADDR1   ADDR2   STMT
+
+                                              24 * Program Description:
+                                              25 *
+                                              26 * ECHO is a bare-metal program.  It requires input/output commands to
+                                              27 * the system's console device.  It's purpose is to exercise the console
+                                              28 * device.
+                                              29 *
+                                              30 * The program is executed by means of an IPL from a card deck. Initially
+                                              31 * a line is diplayed explaining the use of the program.  Following this
+                                              32 * a prompt is displayed with the keyboard unlocked for user input.
+                                              33 * Whatever is typed is then printed on the next line.  This is followed by the
+                                              34 * prompt with user input expected until the user enters 'quit' in lower case.
+                                              35 * without quotes.  quit terminates the program normally.
+                                              36 *
+                                              37 * The system interrupt key or console 'cancel' key will interrupt the
+                                              38 * executing program.  Display a message.  And then return to the normal
+                                              39 * echo functions described above.
+                                              40 *
+                                              41 * Target Platform: SimH
+                                              42 * Target Architecture: S/360
+                                              43 *
+                                              44 * Devices Used:
+                                              45 *   01F - Console device
+                                              46 *
+                                              47 * Program Register Usage:
+
+                            000000  000001    49 R0       EQU   0   Base register for access to the ASA. Required by DSECT
+                                              50 *                  usage, but available for program usage
+                            000001  000001    51 R1       EQU   1   Device Channel and Unit Address for I/O instructions
+                            000002  000001    52 R2       EQU   2   I/O Routine Channel-Address Word
+                            000003  000001    53 R3       EQU   3   Length of data received from the operator
+                            000004  000001    54 R4       EQU   4   available
+                            000005  000001    55 R5       EQU   5   available
+                            000006  000001    56 R6       EQU   6   available
+                            000007  000001    57 R7       EQU   7   available
+                            000008  000001    58 R8       EQU   8   available
+                            000009  000001    59 R9       EQU   9   available
+                            00000A  000001    60 R10      EQU   10  available
+                            00000B  000001    61 R11      EQU   11  Contains zero for STATUS clearing (zero'd from CPU reset).
+                            00000C  000001    62 R12      EQU   12  The global program base register
+                            00000D  000001    63 R13      EQU   13  available
+                            00000E  000001    64 R14      EQU   14  I/O Routine return register.  Program is the caller
+                            00000F  000001    65 R15      EQU   15  Subroutine return register.  I/O routine is the caller
+
+                                              67 * Disabled Wait State PSW's address field values used by the program:
+                                              68 *    X'000000' - Successful execution of the program
+                                              69 *    X'000018' - Unexpected External interruption occurred.
+                                              70 *                Old External PSW at address X'18'
+                                              71 *    X'000020' - Unexpected Supervisor interruption occurred.
+                                              72 *                Old Supervisor PSW at address X'20'
+                                              73 *    X'000028' - Unexpected Program interruption occurred.
+                                              74 *                Old Program PSW address X'28'
+                                              75 *    X'000030' - Unexpected Machine Check interruption occurred.
+ASMA Ver. 0.2.1  ECHO - CONSOLE ECHO TEST                                                           18 Oct 2021 11:03:00  Page     3
+
+ LOC       OBJECT CODE      ADDR1   ADDR2   STMT
+
+                                              76 *                Old Machine Check PSW at address X'30'
+                                              77 *    X'000038' - Unexpected Input/Output interruption occurred.
+                                              78 *                Old Input/Output PSW at address X'38'
+                                              79 *    X'1xccuu' - Device or channel not operational. ccuu=Device Address
+                                              80 *    X'2xccuu' - Device or channel busy.            ccuu=Device Address
+                                              81 *    X'3xccuu' - Device storing of CSW missed       ccuu=Device Address
+                                              82 *    X'4xccuu' - Unexpected device interruption.    ccuu=Device Address
+                                              83 *    X'5xddcc' - Console Device problem.  dd=device status, cc=channel status
+                                              84 *    X'6x00ss' - Console Device sense data.  ss=general sense byte
+                                              85 *                Sense data reporting is not yet enabled.
+ASMA Ver. 0.2.1  ECHO - CONSOLE ECHO TEST                                                           18 Oct 2021 11:03:00  Page     4
+
+ LOC       OBJECT CODE      ADDR1   ADDR2   STMT
+
+                                              87 * See all object data and macro generated model statements in the listing
+                                              88          PRINT DATA,GEN
+
+                                              90 * Inform the SATK macros of the architecture being targeted.  Inferred from
+                                              91 * the ASMA -t command-line argument.
+                                              92          ARCHLVL
+                                              94+$AL      OPSYN AL
+                                              95+$ALR     OPSYN ALR
+                                              96+$B       OPSYN B
+                                              97+$BC      OPSYN BC
+                                              98+$BCTR    OPSYN BCTR
+                                              99+$BE      OPSYN BE
+                                             100+$BH      OPSYN BH
+                                             101+$BL      OPSYN BL
+                                             102+$BM      OPSYN BM
+                                             103+$BNE     OPSYN BNE
+                                             104+$BNH     OPSYN BNH
+                                             105+$BNL     OPSYN BNL
+                                             106+$BNM     OPSYN BNM
+                                             107+$BNO     OPSYN BNO
+                                             108+$BNP     OPSYN BNP
+                                             109+$BNZ     OPSYN BNZ
+                                             110+$BO      OPSYN BO
+                                             111+$BP      OPSYN BP
+                                             112+$BXLE    OPSYN BXLE
+                                             113+$BZ      OPSYN BZ
+                                             114+$CH      OPSYN CH
+                                             115+$CLR     OPSYN CLR
+                                             116+$L       OPSYN L
+                                             117+$LH      OPSYN LH
+                                             118+$LM      OPSYN LM
+                                             119+$LNR     OPSYN LNR
+                                             120+$LPSW    OPSYN LPSW
+                                             121+$LR      OPSYN LR
+                                             122+$LTR     OPSYN LTR
+                                             123+$NR      OPSYN NR
+                                             124+$SL      OPSYN SL
+                                             125+$SLR     OPSYN SLR
+                                             126+$SR      OPSYN SR
+                                             127+$ST      OPSYN ST
+                                             128+$STM     OPSYN STM
+                                             129+$X       OPSYN X
+                                             130+$BAS     OPSYN BAL
+                                             131+$BASR    OPSYN BALR
+                                             132+         MNOTE *,'ARCHLVL - ARCHITECTURE LEVEL SET - 1'
+        ** [132] MNOTE *,ARCHLVL - ARCHITECTURE LEVEL SET - 1
+                                             133 * Ensure interrupt traps are loaded by iplasma.py before program execution
+                                             134 * begins.  This macro will create the memory region that will also contain
+                                             135 * the IPL PSW.  The region name defaults to ASAREGN.  iplasma.py knows how
+                                             136 * to deal with this situation.
+                                             137 ASASECT  ASALOAD
+                            000000  0001FF   138+ASASECT  START 0,ASAREGN
+ASMA Ver. 0.2.1  ECHO - CONSOLE ECHO TEST                                                           18 Oct 2021 11:03:00  Page     5
+
+ LOC       OBJECT CODE      ADDR1   ADDR2   STMT
+
+000000  00020000 00000008                    140+         PSW   0,0,2,0,X'008'      64-bit Restart ISR Trap New PSW
+000008                      000008  000058   141+         ORG   ASASECT+X'058'
+000058  00020000 00000018                    143+         PSW   0,0,2,0,X'018'      64-bit External ISR Trap New PSW
+000060  00020000 00000020                    144+         PSW   0,0,2,0,X'020'      64-bit Supervisor Call ISR Trap New PSW
+000068  00020000 00000028                    145+         PSW   0,0,2,0,X'028'      64-bit Program ISR Trap New PSW
+000070  00020000 00000030                    146+         PSW   0,0,2,0,X'030'      64-bit Machine Check Trap New PSW
+000078  00020000 00000038                    147+         PSW   0,0,2,0,X'038'      64-bit Input/Output Trap New PSW
+000080                      000080  000200   148+         ORG   ASASECT+512
+                                             149          ASAIPL IA=PGMSTART    Define the bare-metal program's IPL PSW
+                            000000  0001FF   150+ASASECT  CSECT
+000200                      000200  000000   151+         ORG   ASASECT
+000000  00000000 00002000                    152+         PSW   0,0,0,0,PGMSTART,24
+000008                      000008  000200   153+         ORG   ASASECT+512      Reset CSECT to end of assigned storage area
+                            000000  0001FF   154+ASASECT  CSECT
+ASMA Ver. 0.2.1  ECHO - POSITION 00 - PROGRAM INITIALIZATION                                        18 Oct 2021 11:03:00  Page     6
+
+ LOC       OBJECT CODE      ADDR1   ADDR2   STMT
+
+                                             156 *
+                                             157 * The Bare-Metal Echo Program
+                                             158 *
+
+                            002000  0021D7   160 PGMSECT  START X'2000',ECHO  Start a second region for the program itself
+                                             161 * This results in ECHO.bin being created in the list directed IPL directory
+002000                      000000           162          USING ASA,0           Give me instruction access to the ASA CSECT
+002000  05C0                                 163 PGMSTART BALR  R12,0           Establish my base register
+002002                      002002           164          USING *,R12           Tell the assembler
+                                             165 *         LPSW  DONE            Check memory before running
+
+
+
+                                             167 * Determine if the console device, subchannel and channel are ready for use.
+002002  4810 C0DE                   0020E0   168          LH    R1,CONDEV   Console device address in I/O inst. register
+002006  9D00 1000                   000000   169          TIO   0(R1)       Determine if the console is there
+00200A  4710 C16A                   00216C   170          BC    B'0001',DEVNOAVL  ..No, CC=3 might have a different config address
+00200E  4720 C17C                   00217E   171          BC    B'0010',DEVBUSY   ..No, CC=2 console device or channel is busy
+002012  4740 C1BA                   0021BC   172          BC    B'0100',CSWSTRD   ..No, CC=1 CSW stored in ASA at X'40'
+                                             173 * Console device is available (CC=0)!
+ASMA Ver. 0.2.1  ECHO - POSITION 01 - GET CONSOLE INPUT                                             18 Oct 2021 11:03:00  Page     7
+
+ LOC       OBJECT CODE      ADDR1   ADDR2   STMT
+
+                                             175 * Send HELLO WORLD message (this will be changed to instructions)
+002016                                       176 ECHOLOOP DS    0H    Query operator and echo data
+002016  9201 C0DC                   0020DE   177          MVI   PGMRTN,HEADER     Displaying the query...
+00201A  40B0 C0E0                   0020E2   178          STH   R11,STATUS        Clear status for console I/O operation
+00201E  9200 C116                   002118   179          MVI   DATA,X'00'        Clear the input...
+002022  D24E C117 C116      002119  002118   180          MVC   DATA+1(L'DATA-1),DATA     ...I/O area.
+002028  4120 C0E6                   0020E8   181          LA    R2,GETDATA        Locate the initial CCW
+00202C  5020 0048                   000048   182          ST    R2,CAW            Tell the I/O request its address in ASA
+002030  9C00 1000                   000000   183          SIO   0(R1)       Request console channel program to start, did it?
+002034  4710 C16A                   00216C   184          BC    B'0001',DEVNOAVL  ..No, CC=3 don't know why, but tell someone.
+002038  4720 C17C                   00217E   185          BC    B'0010',DEVBUSY   ..No, CC=2 console device or channel is busy
+00203C  4740 C1BA                   0021BC   186          BC    B'0100',CSWSTRD   ..No, CC=1 CSW stored in ASA at X'40'
+                                             187 * Transfer initiated (CC=0)...
+002040  9D00 1000                   000000   188 POLL1    TIO   0(R1)             Test the I/O progress.
+002044  4720 C03E                   002040   189          BC    B'0010',POLL1     CC=2, data still being sent, cont. polling
+002048  4710 C16A                   00216C   190          BC    B'0001',DEVNOAVL  CC=3 don't know why, but tell someone.
+00204C  4780 C18E                   002190   191          BC    B'1000',NOCSW     CC=0 missed CSW, don't know why abort
+                                             192 * CSW stored (CC=1), analyze for result.
+002050  D601 C0E0 0044      0020E2  000044   193          OC    STATUS,CSW+4      Accummulate Device and Channel status
+002056  9500 C0E1                   0020E3   194          CLI   STATUS+1,X'00'    Did the channel have a problem?
+00205A  4770 C1B0                   0021B2   195          BNE   CSWACCUM          ..Yes, end with a device/channel error
+                                             196 * Test for abnormal status for a console device
+00205E  9142 C0E0                   0020E2   197          TM    STATUS,X'42'      Was a device error reported?
+                                             198 * ATTN, X'80', and UNIT EXCEPTION, X'01', are treated as normal.  ATTN is
+                                             199 * generated by the operator hitting the ATTN key.  And UNIT EXCEPTION is
+                                             200 * generated by the operator hitting the CANCEL key.  Not all console
+                                             201 * emulations support both possible actions by the operator.
+                                             202 *
+                                             203 * Channel end, control unit end and busy are ignored.
+002062  4770 C1B0                   0021B2   204          BNZ   CSWACCUM          ..Yes, end with a device/channel error
+002066  9104 C0E0                   0020E2   205          TM    STATUS,X'04'      Device finally done?
+00206A  47E0 C03E                   002040   206          BNO   POLL1             ..No, Check again....
+
+                                             208 * TODO: Add logic to handle ATTN and CANCEL from the operator
+00206E  4830 C0FE                   002100   209          LH    R3,INLEN          Fetch the lengh of the input area
+002072  4B30 0046                   000046   210          SH    R3,CSW+6          Calculate actual bytes read
+002076  4930 C100                   002102   211          CH    R3,QUITLEN        Was only four bytes entered?
+00207A  4780 C07C                   00207E   212          BE    CKQUIT
+
+00207E                                       214 CKQUIT   DS    0H   Check if operator entered quit
+00207E  D503 C102 C116      002104  002118   215          CLC   QUIT,DATA         Did operator enter quit
+002084  4780 C166                   002168   216          BE    FINISH            ..Yes, end the program.
+
+                                             218 *
+                                             219 * No, echo operator's input data on the console
+                                             220 *
+002088  9202 C0DC                   0020DE   221          MVI   PGMRTN,ECHODATA   Displaying the query..
+00208C  40B0 C0E0                   0020E2   222          STH   R11,STATUS        Clear status for console I/O operation
+002090  4030 C0FC                   0020FE   223          STH   R3,PUTLEN         Update the CCW with the actual output length
+002094  4120 C0F6                   0020F8   224          LA    R2,PUTDATA        Locate the initial CCW
+002098  5020 0048                   000048   225          ST    R2,CAW            Tell the I/O request its address in ASA
+00209C  9C00 1000                   000000   226          SIO   0(R1)       Request console channel program to start, did it?
+ASMA Ver. 0.2.1  ECHO - POSITION 01 - GET CONSOLE INPUT                                             18 Oct 2021 11:03:00  Page     8
+
+ LOC       OBJECT CODE      ADDR1   ADDR2   STMT
+
+0020A0  4710 C16A                   00216C   227          BC    B'0001',DEVNOAVL  ..No, CC=3 don't know why, but tell someone.
+0020A4  4720 C17C                   00217E   228          BC    B'0010',DEVBUSY   ..No, CC=2 console device or channel is busy
+0020A8  4740 C1BA                   0021BC   229          BC    B'0100',CSWSTRD   ..No, CC=1 CSW stored in ASA at X'40'
+                                             230 * Transfer initiated (CC=0)...
+0020AC  9D00 1000                   000000   231 POLL2    TIO   0(R1)             Test the I/O progress.
+0020B0  4720 C0AA                   0020AC   232          BC    B'0010',POLL2     CC=2, data still being sent, cont. polling
+0020B4  4710 C16A                   00216C   233          BC    B'0001',DEVNOAVL  CC=3 don't know why, but tell someone.
+0020B8  4780 C18E                   002190   234          BC    B'1000',NOCSW     CC=0 missed CSW, don't know why abort
+                                             235 * CSW stored (CC=1), analyze for result.
+0020BC  D601 C0E0 0044      0020E2  000044   236          OC    STATUS,CSW+4      Accummulate Device and Channel status
+0020C2  9500 C0E1                   0020E3   237          CLI   STATUS+1,X'00'    Did the channel have a problem?
+0020C6  4770 C1B0                   0021B2   238          BNE   CSWACCUM          ..Yes, end with a device/channel error
+                                             239 * Test for abnormal status for a console device (see above for details)
+0020CA  9142 C0E0                   0020E2   240          TM    STATUS,X'42'      Was a device error reported?
+0020CE  4770 C1B0                   0021B2   241          BNZ   CSWACCUM          ..Yes, end with a device/channel error
+0020D2  9104 C0E0                   0020E2   242          TM    STATUS,X'04'      Device finally done?
+0020D6  47E0 C0AA                   0020AC   243          BNO   POLL2             ..No, continue waiting for device end
+0020DA  47F0 C014                   002016   244          B     ECHOLOOP          ..Yes, get operator's next output
+
+
+
+                                             246 * Program position used in building abend address
+                            000000  000001   247 INIT     EQU   X'00'        Program initialization
+                            000001  000001   248 HEADER   EQU   X'01'        Operator prompt and input retrieved
+                            000002  000001   249 ECHODATA EQU   X'02'        Echoing data from the operator
+0020DE  00                                   250 PGMRTN   DC    AL1(INIT)    Initialize program position data
+
+
+
+                                             252 *
+                                             253 * I/O related information
+                                             254 *
+0020E0                                       255          DS    0H          Align half words
+0020E0  001F                                 256 CONDEV   DC    XL2'001F'   Console device address
+0020E2  0000                                 257 STATUS   DC    XL2'0000'   Used to accumulate unit and channel status
+
+
+
+                                             259 *
+                                             260 * Channel Command Words
+                                             261 *
+0020E8  01002108 40000007                    262 GETDATA  CCW   X'01',ENTER,X'40',L'ENTER   Display 'ENTER: ' on console
+                                             263 *              Command-chain (X'40') to the next CCW
+0020F0  0A002118 20000050                    264          CCW   X'0A',DATA,X'20',L'DATA     Read operator's data
+                                             265 *              Suppress Incorrect Length Indicator - operator's data varies
+
+0020F8  09002118 00000000                    267 PUTDATA  CCW   X'09',DATA,0,0              Echo operator's data
+002100                      002100  0000FE   268          ORG   PUTDATA+6
+0020FE  0000                                 269 PUTLEN   DS    HL2                         Echo'd data's length
+
+002100  0050                                 271 INLEN    DC    Y(L'DATA)     Input data length (Could also use prev. CCW)
+002102  0004                                 272 QUITLEN  DC    Y(L'QUIT)     Length of quit literal
+ASMA Ver. 0.2.1  ECHO - POSITION 01 - GET CONSOLE INPUT                                             18 Oct 2021 11:03:00  Page     9
+
+ LOC       OBJECT CODE      ADDR1   ADDR2   STMT
+
+
+002104  98A489A3                             274 QUIT     DC    C'quit'       quit (terminates the program)
+002108  C5D5E3C5 D97A40                      275 ENTER    DC    C'ENTER: '
+002110  00000000 00000000                    276          DS    D
+002118  00000000 00000000                    277 DATA     DC    XL80'00'
+002120  00000000 00000000
+002128  00000000 00000000
+002130  00000000 00000000
+002138  00000000 00000000
+002140  00000000 00000000
+002148  00000000 00000000
+002150  00000000 00000000
+002158  00000000 00000000
+002160  00000000 00000000
+ASMA Ver. 0.2.1  ECHO - PROGRAM TERMINATIONS                                                        18 Oct 2021 11:03:00  Page    10
+
+ LOC       OBJECT CODE      ADDR1   ADDR2   STMT
+
+                                             279 *
+                                             280 * NORMAL PROGARM TERMINATION
+                                             281 *
+                                             282 * Register usage:
+                                             283 *   R12 - Global program base address
+                                             284 * Normal Termination:
+                                             285 *   Termination code X'000000'
+
+002168  8200 C1CE                   0021D0   287 FINISH   LPSW  DONE     Normally Terminate the program
+
+
+
+                                             289 *
+                                             290 * REPORT DEVICE NOT OPERATIONAL - Uses Format 1 ABEND
+                                             291 *
+                                             292 * Register usage:
+                                             293 *   R1  - Device Channel/Unit address
+                                             294 *   R12 - Global program base address
+                                             295 * Abnormal Termination:
+                                             296 *    Format 1 ABEND code X'10'
+
+00216C                                       298 DEVNOAVL DS    0H
+00216C  4010 C1D4                   0021D6   299          STH   1,FMT1CUU         Set the failing device address
+002170  9210 C1D3                   0021D5   300          MVI   FMT1CODE,X'10'    Set the abend code
+002174  D600 C1D3 C0DC      0021D5  0020DE   301          OC    FMT1CODE,PGMRTN   Set where the abend was detected
+00217A  8200 C1CE                   0021D0   302          LPSW  DONE              End execution abnormally
+
+
+
+                                             304 *
+                                             305 * REPORT DEVICE BUSY - Uses Format 1 ABEND
+                                             306 *
+                                             307 * Register usage:
+                                             308 *   R1  - Device Channel/Unit address
+                                             309 *   R12 - Global program base address
+                                             310 * Abnormal Termination:
+                                             311 *    Format 1 ABEND code X'20
+
+00217E                                       313 DEVBUSY  DS    0H
+00217E  4010 C1D4                   0021D6   314          STH   1,FMT1CUU         Set the failing device address
+002182  9220 C1D3                   0021D5   315          MVI   FMT1CODE,X'20'    Set the abend code
+002186  D600 C1D3 C0DC      0021D5  0020DE   316          OC    FMT1CODE,PGMRTN   Set where the abend was detected
+00218C  8200 C1CE                   0021D0   317          LPSW  DONE              End execution abnormally
+
+                                             319 *
+                                             320 * REPORT MISSING STORING OF CSW - Uses Format 1 ABEND
+                                             321 *
+                                             322 * Register usage:
+                                             323 *   R1  - Device Channel/Unit address
+                                             324 *   R12 - Global program base address
+                                             325 * Abnormal Termination:
+                                             326 *    Format 1 ABEND code X'30
+ASMA Ver. 0.2.1  ECHO - PROGRAM TERMINATIONS                                                        18 Oct 2021 11:03:00  Page    11
+
+ LOC       OBJECT CODE      ADDR1   ADDR2   STMT
+
+
+002190                                       328 NOCSW    DS    0H
+002190  4010 C1D4                   0021D6   329          STH   1,FMT1CUU         Set the failing device address
+002194  9230 C1D3                   0021D5   330          MVI   FMT1CODE,X'30'    Set the abend code
+002198  D600 C1D3 C0DC      0021D5  0020DE   331          OC    FMT1CODE,PGMRTN   Set where the abend was detected
+
+
+
+                                             333 *
+                                             334 * REPORT UNEXPECTED DEVICE RESPONSE - Uses Format 1 ABEND PSW
+                                             335 *
+                                             336 * Register usage:
+                                             337 *   R1  - Device Channel/Unit address
+                                             338 *   R12 - Global program base address
+                                             339 * Abnormal Termination:
+                                             340 *    Format 1 ABEND code X'4x'
+
+00219E                                       342 DEVUNKN  DS    0H
+00219E  D201 C1D4 003A      0021D6  00003A   343          MVC   FMT1CUU,IOOPSW+2 Set the unexpected device address
+0021A4  9240 C1D3                   0021D5   344          MVI   FMT1CODE,X'40'   Set the abend code
+0021A8  D600 C1D3 C0DC      0021D5  0020DE   345          OC    FMT1CODE,PGMRTN  Set where the abend was detected
+0021AE  8200 C1CE                   0021D0   346          LPSW  DONE            End execution abnormally
+
+
+
+                                             348 *
+                                             349 * REPORT CONSOLE DEVICE OR CHANNEL ERROR STATUS - Uses Format 2 ABEND PSW
+                                             350 *
+                                             351 * Register usage:
+                                             352 *   R1  - Device Channel/Unit address
+                                             353 *   R12 - Global program base address
+                                             354 * Abnormal Termination:
+                                             355 *    Format 2 ABEND code X'5x'
+
+0021B2                                       357 CSWACCUM DS    0H    Store the accumulated status in the abort PSW
+0021B2  D201 C1D4 C0E0      0021D6  0020E2   358          MVC   FMT2STAT,STATUS   Move accumulated status to abort PSW
+0021B8  47F0 C1C0                   0021C2   359          B     CODE50            Set up format 2 abend code
+0021BC                                       360 CSWSTRD  DS    0H
+0021BC  D201 C1D4 0044      0021D6  000044   361          MVC   FMT2STAT,CSW+4    Move stored CSW status to the abort PSW
+
+0021C2                                       363 CODE50   DS    0H
+0021C2  9250 C1D3                   0021D5   364          MVI   FMT2CODE,X'50'    Set the abend code
+0021C6  D600 C1D3 C0DC      0021D5  0020DE   365          OC    FMT2CODE,PGMRTN   Set where the abend was detected
+0021CC  8200 C1CE                   0021D0   366          LPSW  DONE              End execution abnormally
+
+
+
+                                             368 *
+                                             369 * REPORT CONSOLE DEVICE SENSE - Uses Format 3 ABEND PSW
+                                             370 *
+                                             371 * Register usage:
+                                             372 *   R1  - Device Channel/Unit address
+ASMA Ver. 0.2.1  ECHO - PROGRAM TERMINATIONS                                                        18 Oct 2021 11:03:00  Page    12
+
+ LOC       OBJECT CODE      ADDR1   ADDR2   STMT
+
+                                             373 *   R12 - Global program base address
+                                             374 * Abnormal Termination:
+                                             375 *    Format 3 ABEND code X'50'
+                                             376 *
+                                             377 *ABENDSNS DS    0H
+                                             378 *         MVC   FMT3SNS,SENSDATA   Move the generic sense byte abend PSW
+                                             379 *         MVI   FMT3CODE,X'50'     Set the abend code
+                                             380 *         LPSW  DONE
+
+
+
+                                             382 *
+                                             383 * TERMINATION PSW Formats
+                                             384 *
+0021D0  00020000 00000000                    385 DONE     PSW360 0,0,2,0,0
+0021D8                      0021D8  0001D5   386          ORG  *-3
+0021D5                                       387 FORMAT   DS   0AL3
+                                             388 * Format 1 ABEND FORMAT
+0021D5  00                                   389 FMT1CODE DS   X'00'   aa - Abend codes: 1x, 2x, 3x - x=program position
+0021D6  0000                                 390 FMT1CUU  DS   H'0'    ccuu - address of device causing the termination
+0021D8                      0021D8  0001D5   391          ORG  FORMAT
+                                             392 * Format 2 ABEND FORMAT
+0021D5  00                                   393 FMT2CODE DS   X'00'   aa - Abend Code: 4x - x=program position
+0021D6  0000                                 394 FMT2STAT DS   H'00'   ddcc - dd=console device status, cc=channel status
+0021D8                      0021D8  0001D5   395          ORG  FORMAT
+                                             396 * Format 3 ABEND FORMAT
+0021D5  00                                   397 FMT3CODE DS   X'00'   aa - Abend Code: 50
+0021D6  00                                   398          DS   X'00'   not used: X'00'
+0021D7  00                                   399 FMT3SNS  DS   X'00'   ss - console device generic sense data
+ASMA Ver. 0.2.1  ECHO - INPUT/OUTPUT SUBROUTINES                                                    18 Oct 2021 11:03:00  Page    13
+
+ LOC       OBJECT CODE      ADDR1   ADDR2   STMT
+
+                                             401 *
+                                             402 * I/O WAIT SUBROUTINE
+                                             403 *
+                                             404 *  Register usage:
+                                             405 *    R1  - Device Channel/Unit address
+                                             406 *    R12 - Global program base address
+                                             407 *    R15 - Subroutine return address
+                                             408 *
+                                             409 *  Abnormal Terminations:
+                                             410 *    Interrupt from unexpected device received.
+                                             411 *DOWAIT   MVC   IONPSW(8),CONT  Set up continuation PSW for after I/O interrupt
+                                             412 *         LPSW  WAIT       Wait for I/O interruption and CSW from channel
+                                             413 *IODONE   EQU   *          The bare-metal program continues here after I/O
+                                             414 *         MVC   IONPSW(8),IOTRAP     Restore I/O trap PSW
+                                             415 *   Did the interruption come from the expected device?
+                                             416 *         CH    R1,IOOPSW+2          Is the interrupt from the expected device?
+                                             417 *         BER   R15                  ..Yes, return to caller
+                                             418 *         B     DEVUNKN              ..No, end program with an error
+                                             419 *         SPACE 1
+                                             420 *WAIT     PSW360 X'F8',0,2,0,0       Causes CPU to wait for I/O interruption
+                                             421 *                                   Channels 0-4 enabled for interrupts
+                                             422 *CONT     PSW360 0,0,0,0,IODONE      Causes the CPU to continue after waiting
+                                             423 *IOTRAP   PSW360 0,0,2,0,X'38'       I/O trap New PSW (restored after I/O)
+
+
+
+                                             425 *
+                                             426 * Hardware Assigned Storage Locations
+                                             427 *
+
+                                             429 * This DSECT allows symbolic access to these locations.  The DSECT created is
+                                             430 * named ASA.
+                                             431 ASA      ASAREA DSECT=YES
+                                             432+ASA      DSECT
+                            000000  000001   433+ASBEGIN  EQU   *                   Start of absolute/real assigned storage areas
+000000  00000000 00000000                    434+IPLPSW   DC    FD'0'        000 A  Initial Program Load Program Status Word
+000008  00000000 00000000                    435+IPLCCW1  DC    FD'0'        008 A  Initial Program Load first Channel Command Word
+000010  00000000 00000000                    436+IPLCCW2  DC    FD'0'        010 A  Initial program Load second Channel Command Word
+                                             437+* RESTART RELATED PROGRAM STATUS WORDS
+000018                      000018  000000   438+         ORG   ASBEGIN
+000000  00000000 00000000                    439+RSTNPSW  DC    FD'0'        000 R  Restart New PSW
+000008  00000000 00000000                    440+RSTOPSW  DC    FD'0'        008 R  Restart Old PSW
+000010  00000000 00000000                    441+UA0      DC    FD'0'        010 R  Unassigned Area 0
+                                             442+* INTERRUPTION OLD PROGRAM STATUS WORD SAVE AREAS
+000018  00000000 00000000                    443+EXTOPSW  DC    FD'0'        018 R  External Interrupt Old PSW
+000020  00000000 00000000                    444+SVCOPSW  DC    FD'0'        020 R  Supervisor Call Old PSW
+000028  00000000 00000000                    445+PGMOPSW  DC    FD'0'        028 R  Program Old PSW
+000030  00000000 00000000                    446+MCKOPSW  DC    FD'0'        030 R  Machine Check Old PSW
+000038  00000000 00000000                    447+IOOPSW   DC    FD'0'        038 R  Input/Output Old PSW
+                                             448+* System/360 or System/370 Basic Control Mode INTERRUPTION INFORMATION
+000040                      000040  00001A   449+         ORG   EXTOPSW+2
+00001A  0000                                 450+BCEXTCOD DC    H'0'         01A R  External Interuption Code
+ASMA Ver. 0.2.1  ECHO - INPUT/OUTPUT SUBROUTINES                                                    18 Oct 2021 11:03:00  Page    14
+
+ LOC       OBJECT CODE      ADDR1   ADDR2   STMT
+
+00001C                      00001C  000022   451+         ORG   SVCOPSW+2
+000022  0000                                 452+BCSVCCOD DC    H'00'        022 R  Supervisor Call Interruption Code
+000024                      000024  00002A   453+         ORG   PGMOPSW+2
+00002A  0000                                 454+BCPGMCOD DC    H'0'         02A R  Program Interruption Code
+00002C                      00002C  000032   455+         ORG   MCKOPSW+2
+000032  0000                                 456+BCMCKCOD DC    H'0'         032 R  Machine Check Interruption Code
+000034                      000034  00003A   457+         ORG   IOOPSW+2
+00003A  0000                                 458+BCIOCOD  DC    H'0'         03A R  Input/Output Interruption Code (Device CCUU)
+00003C                      00003C  000040   459+         ORG   *+4
+                                             460+* CHANNEL-BASED INPUT/OUTPUT INTERRUPT RELATED
+000040  00000000 00000000                    461+CSW      DC    FD'0'        040 R  Channel Status Word
+000048                                       462+CAW      DC    0F'0'        048 R  Channel Address Word
+000048  00                                   463+CAWKEY   DC    X'00'        048 R  Channel Storage Key (bits 0-3)
+                            000008  000001   464+CAWSUSP  EQU   X'08'        048 R  Suspend Control (bit 4)
+000049  000000                               465+CAWADDR  DC    AL3(0)       049 R  Channel Command Address
+00004C  00000000                             466+UA1      DC    F'0'         04C R  Unassigend Area 1
+                                             467+* MISCELANEOUS AREAS
+000050  00000000                             468+TIMER    DC    F'0'         050 R  System/360 and System/370 Interval Timer
+000054  00000000                             469+TTDES    DC    F'0'         054 R  System/370 Trace-Table-Designation
+                                             470+* INTERRUPTION NEW PROGRAM STATUS WORD AREAS
+000058                      000058  000058   471+         ORG   ASBEGIN+X'58'
+000058  00000000 00000000                    472+EXTNPSW  DC    FD'0'        058 R  External New PSW
+000060  00000000 00000000                    473+SVCNPSW  DC    FD'0'        060 R  Supervisor Call New PSW
+000068  00000000 00000000                    474+PGMNPSW  DC    FD'0'        068 R  Program New PSW
+000070  00000000 00000000                    475+MCKNPSW  DC    FD'0'        070 R  Machine Check New PSW
+000078  00000000 00000000                    476+IONPSW   DC    FD'0'        078 R  Input/Output New PSW
+                                             477+* System/360 Diagnostic Scanout Area
+000080                                       478+SCANOUT  DS    0X           080 A  System/360 Diagnostic Scanout Area
+                            000000  000001   479+SCANOUTL EQU   *-SCANOUT           System/360 Diagnostic Scanout Area Length
+                                             480+* EXTERNAL INTERRUPTION INFORMATION
+000080                      000080  000080   481+         ORG   ASBEGIN+X'80'
+000080  00000000                             482+EXTIPARM DC    F'0'         080 R  External-interruption Parameter
+000084  0000                                 483+EXTCPUAD DC    H'0'         084 R  External-interruption CPU Address
+000086  0000                                 484+EXTICODE DC    H'0'         086 R  External-interruption Code
+                                             485+* SUPERVISOR CALL INTERRUPTION INFORMATION
+000088                                       486+SVCIID   DC    0F'0'        088 R  Supervisor-Call Interuption Identification
+000088  00                                   487+         DC    X'00'        088 R  not-used - zeros stored
+000089  00                                   488+SVCIILC  DC    X'00'        089 R  Supervisor-Call instruction length code
+                            00000C  000001   489+SVCIILCM EQU   B'00001100'         Supervisor-Call ILC mask, zeros stored in other bits
+00008A  0000                                 490+SVCICODE DC    H'0'         08A R  Supervisor-Call Interruption Code
+                                             491+* PROGRAM INTERRUPTION INFORMATION
+00008C                                       492+PGMIID   DC    0F'0'        08C R  Program-interruption identification
+00008C  00                                   493+         DC    X'00'        08C R  not-used - zeros stored
+00008D  00                                   494+PGMIILC  DC    X'00'        08D R  Program instruction lengh code
+                            00000C  000001   495+PGMIILCM EQU   B'00001100'         Progrtam ILC mask, zeros stored in other bits
+00008E  0000                                 496+PGMICODE DC    H'0'         08E R  Program Interruption Code
+000090                                       497+PGMDXC   DC    0F'0'        090 R  Data-Exception Code
+000090  00000000                             498+PGMTRX   DC    F'0'         090 R  Translation-Exception Identification
+000094                                       499+MONCLS   DC    0H'0'        094 R  Monitor-Class Number
+000094  00                                   500+         DC    X'00'        094 R  not-used - zeros stored
+000095  00                                   501+MONNUMBR DC    X'00'        095 R  Monitor-Class Number stored
+000096  00                                   502+PERCODE  DC    X'00'        096 R  Program-Event-Recording Code
+ASMA Ver. 0.2.1  ECHO - INPUT/OUTPUT SUBROUTINES                                                    18 Oct 2021 11:03:00  Page    15
+
+ LOC       OBJECT CODE      ADDR1   ADDR2   STMT
+
+                            0000F0  000001   503+PERCODMK EQU   B'11110000'         Program-Event-Recordind Code mask in bits 0-3
+000097  00                                   504+         DC    X'00'        097 R  PER Code not used - zeros stored
+000098  00000000                             505+PERADDR  DC    F'0'         098 R  PER Address
+00009C  00000000                             506+MONCODE  DC    F'0'         09C R  Monitor Event Code in bytes 1-3, zeros in byte 0
+0000A0  00                                   507+PGMACCID DC    X'00'        0A0 R  Exception access identification
+0000A1  00                                   508+PERACCID DC    X'00'        0A1 R  PER access identification
+0000A2  00                                   509+MPGACCID DC    X'00'        0A2 R  MOVE PAGE Operand access identification
+0000A3                                       510+SSARCHMD DC    0X'00'       0A3 A  Store Status Architectural Mode Identification
+0000A3  00                                   511+MKARCHMD DC    X'00'        0A3 R  Machine-Check Architectural Mode Identification
+0000A4  00000000                             512+UA2      DC    F'0'         0A4 R  Unused area
+                                             513+* System/370 CHANNEL INPUT/OUTPUT INFORMATION
+0000A8                      0000A8  0000A8   514+         ORG   ASBEGIN+X'A8'
+0000A8  00000000                             515+CHANID   DC    F'0'         0A8 R  System/370 STORE CHANNEL ID location
+0000AC  00000000                             516+IOELADDR DC    F'0'         0AC R  System/370 I/O Extended Logout Address
+0000B0  00000000                             517+LCHANLOG DC    F'0'         0B0 R  System/370 Limited Channel Logout Area
+0000B4  00000000                             518+UA3      DC    F'0'         0B4 R  unused by System/370
+0000B8  00                                   519+UA4      DC    X'00'        0B8 R  unused by System/370
+0000B9  00                                   520+MEASUREB DC    X'00'        0B9 R  System/370 Measurement Byte
+0000BA  0000                                 521+IOICODE  DC    H'0'         0BA R  System/370 Input/Output Interruption Device Address
+                                             522+* MACHINE-CHECK INTERRUPTION INFORMATION
+0000BC                      0000BC  0000D4   523+         ORG   ASBEGIN+X'D4'
+0000D4  00000000                             524+MKXSAA   DC    F'0'         0D4 R  Machine-Check Extended Save Area Address
+0000D8  00000000 00000000                    525+MKCPUTIM DC    FD'0'        0D8 R  Machine-Check CPU timer save area
+0000E0  00000000 00000000                    526+MKCLKCMP DC    FD'0'        0E0 R  Machine-Check clock comparator save area
+0000E8  00000000                             527+MKICODE  DC    F'0'         0E8 R  Machine-Check interruption code
+0000EC  00000000 00000000                    528+UA6      DC    XL8'00'      0EC R  unused area
+0000F4  00000000                             529+MKDMGCOD DC    F'0'         0F4 R  Machine-Check external damage code
+0000F8                                       530+ZMKFAILA DC    0FD'0'       0F8 R  Machine-Check failing storage address
+0000F8  00000000                             531+MKFAILA  DC    F'0'         0F8 R  Machine-Check failing storage address
+0000FC  00000000                             532+MKMODEL  DC    F'0'         0FC R  Machine-Check model dependent information
+000100  00000000 00000000                    533+MKLOGOUT DC    4F'0'        100 R  ESA machine-check fixed logout area
+000108  00000000 00000000
+000110                      000110  000120   534+         ORG   ASBEGIN+X'120'
+000120  00000000 00000000                    535+MKARS    DC    16F'0'       120 R  Machine-Check access register save area
+000128  00000000 00000000
+000130  00000000 00000000
+000138  00000000 00000000
+000140  00000000 00000000
+000148  00000000 00000000
+000150  00000000 00000000
+000158  00000000 00000000
+                            000160  000001   536+ASEND    EQU   *                   End of absolute/real assigned storage areas
+                            000160  000001   537+ASLENGTH EQU   ASEND-ASBEGIN       Length of absolute/real assigned storage area
+                                             538          END
+ASMA Ver. 0.2.1  ECHO - INPUT/OUTPUT SUBROUTINES                                                    18 Oct 2021 11:03:00  Page    16
+
+     SYMBOL        TYPE  VALUE   LENGTH  DEFN  REFERENCES
+
+ASA                 4    000000     352   432  162
+ASAREGN             2    000000     512   138
+ASASECT             J    000000     512   138  141  148  151  153
+ASBEGIN             U    000000       1   433  438  471  481  514  523  534  537
+ASEND               U    000160       1   536  537
+ASLENGTH            U    000160       1   537
+BCEXTCOD            H    00001A       2   450
+BCIOCOD             H    00003A       2   458
+BCMCKCOD            H    000032       2   456
+BCPGMCOD            H    00002A       2   454
+BCSVCCOD            H    000022       2   452
+CAW                 F    000048       4   462  182  225
+CAWADDR             R    000049       3   465
+CAWKEY              X    000048       1   463
+CAWSUSP             U    000008       1   464
+CHANID              F    0000A8       4   515
+CKQUIT              H    00207E       2   214  212
+CODE50              H    0021C2       2   363  359
+CONDEV              X    0020E0       2   256  168
+CSW                 F    000040       8   461  193  210  236  361
+CSWACCUM            H    0021B2       2   357  195  204  238  241
+CSWSTRD             H    0021BC       2   360  172  186  229
+DATA                X    002118      80   277  179  180  215  264  267  271
+DEVBUSY             H    00217E       2   313  171  185  228
+DEVNOAVL            H    00216C       2   298  170  184  190  227  233
+DEVUNKN             H    00219E       2   342
+DONE                3    0021D0       8   385  287  302  317  346  366
+ECHO                2    002000     472   160
+ECHODATA            U    000002       1   249  221
+ECHOLOOP            H    002016       2   176  244
+ENTER               C    002108       7   275  262
+EXTCPUAD            H    000084       2   483
+EXTICODE            H    000086       2   484
+EXTIPARM            F    000080       4   482
+EXTNPSW             F    000058       8   472
+EXTOPSW             F    000018       8   443  449
+FINISH              I    002168       4   287  216
+FMT1CODE            X    0021D5       1   389  300  301  315  316  330  331  344  345
+FMT1CUU             H    0021D6       2   390  299  314  329  343
+FMT2CODE            X    0021D5       1   393  364  365
+FMT2STAT            H    0021D6       2   394  358  361
+FMT3CODE            X    0021D5       1   397
+FMT3SNS             X    0021D7       1   399
+FORMAT              R    0021D5       3   387  391  395
+GETDATA             W    0020E8       8   262  181
+HEADER              U    000001       1   248  177
+IMAGE               1    000000     984     0
+INIT                U    000000       1   247  250
+INLEN               Y    002100       2   271  209
+IOELADDR            F    0000AC       4   516
+IOICODE             H    0000BA       2   521
+IONPSW              F    000078       8   476
+ASMA Ver. 0.2.1  ECHO - INPUT/OUTPUT SUBROUTINES                                                    18 Oct 2021 11:03:00  Page    17
+
+     SYMBOL        TYPE  VALUE   LENGTH  DEFN  REFERENCES
+
+IOOPSW              F    000038       8   447  457  343
+IPLCCW1             F    000008       8   435
+IPLCCW2             F    000010       8   436
+IPLPSW              F    000000       8   434
+LCHANLOG            F    0000B0       4   517
+MCKNPSW             F    000070       8   475
+MCKOPSW             F    000030       8   446  455
+MEASUREB            X    0000B9       1   520
+MKARCHMD            X    0000A3       1   511
+MKARS               F    000120       4   535
+MKCLKCMP            F    0000E0       8   526
+MKCPUTIM            F    0000D8       8   525
+MKDMGCOD            F    0000F4       4   529
+MKFAILA             F    0000F8       4   531
+MKICODE             F    0000E8       4   527
+MKLOGOUT            F    000100       4   533
+MKMODEL             F    0000FC       4   532
+MKXSAA              F    0000D4       4   524
+MONCLS              H    000094       2   499
+MONCODE             F    00009C       4   506
+MONNUMBR            X    000095       1   501
+MPGACCID            X    0000A2       1   509
+NOCSW               H    002190       2   328  191  234
+PERACCID            X    0000A1       1   508
+PERADDR             F    000098       4   505
+PERCODE             X    000096       1   502
+PERCODMK            U    0000F0       1   503
+PGMACCID            X    0000A0       1   507
+PGMDXC              F    000090       4   497
+PGMICODE            H    00008E       2   496
+PGMIID              F    00008C       4   492
+PGMIILC             X    00008D       1   494
+PGMIILCM            U    00000C       1   495
+PGMNPSW             F    000068       8   474
+PGMOPSW             F    000028       8   445  453
+PGMRTN              R    0020DE       1   250  177  221  301  316  331  345  365
+PGMSECT             J    002000     472   160
+PGMSTART            I    002000       2   163  152
+PGMTRX              F    000090       4   498
+POLL1               I    002040       4   188  189  206
+POLL2               I    0020AC       4   231  232  243
+PUTDATA             W    0020F8       8   267  268  224
+PUTLEN              U    0020FE       2   269  223
+QUIT                C    002104       4   274  215  272
+QUITLEN             Y    002102       2   272  211
+R0                  U    000000       1    49
+R1                  U    000001       1    51  168  169  183  188  226  231
+R10                 U    00000A       1    60
+R11                 U    00000B       1    61  178  222
+R12                 U    00000C       1    62  163  164
+R13                 U    00000D       1    63
+R14                 U    00000E       1    64
+ASMA Ver. 0.2.1  ECHO - INPUT/OUTPUT SUBROUTINES                                                    18 Oct 2021 11:03:00  Page    18
+
+     SYMBOL        TYPE  VALUE   LENGTH  DEFN  REFERENCES
+
+R15                 U    00000F       1    65
+R2                  U    000002       1    52  181  182  224  225
+R3                  U    000003       1    53  209  210  211  223
+R4                  U    000004       1    54
+R5                  U    000005       1    55
+R6                  U    000006       1    56
+R7                  U    000007       1    57
+R8                  U    000008       1    58
+R9                  U    000009       1    59
+RSTNPSW             F    000000       8   439
+RSTOPSW             F    000008       8   440
+SCANOUT             X    000080       1   478  479
+SCANOUTL            U    000000       1   479
+SSARCHMD            X    0000A3       1   510
+STATUS              X    0020E2       2   257  178  193  194  197  205  222  236  237  240  242  358
+SVCICODE            H    00008A       2   490
+SVCIID              F    000088       4   486
+SVCIILC             X    000089       1   488
+SVCIILCM            U    00000C       1   489
+SVCNPSW             F    000060       8   473
+SVCOPSW             F    000020       8   444  451
+TIMER               F    000050       4   468
+TTDES               F    000054       4   469
+UA0                 F    000010       8   441
+UA1                 F    00004C       4   466
+UA2                 F    0000A4       4   512
+UA3                 F    0000B4       4   518
+UA4                 X    0000B8       1   519
+UA6                 X    0000EC       8   528
+ZMKFAILA            F    0000F8       8   530
+ASMA Ver. 0.2.1  ECHO - INPUT/OUTPUT SUBROUTINES                                                    18 Oct 2021 11:03:00  Page    19
+
+ MACRO    DEFN  REFERENCES
+
+ARCHIND     93
+ARCHLVL     92
+ASAIPL     149
+ASALOAD    137
+ASAREA     431
+TRAP64     139   142
+ASMA Ver. 0.2.1  ECHO - INPUT/OUTPUT SUBROUTINES                                                    18 Oct 2021 11:03:00  Page    20
+
+   DESC     SYMBOL  SIZE    POS       ADDR
+
+Entry: 0
+
+Image      IMAGE     984  000-3D7  0000-03D7
+  Region   ASAREGN   512  000-1FF  0000-01FF
+    CSECT  ASASECT   512  000-1FF  0000-01FF
+  Region   ECHO      472  200-3D7  2000-21D7
+    CSECT  PGMSECT   472  200-3D7  2000-21D7
+
+
+ ADDR    POS                                OBJECT CONTENT                                         CHARACTER CONTENT
+
+
+Region: ASAREGN
+
+000000   000   00000000 00002000 00000000 00000000  00000000 00000000 00000000 00000000   |................ ................|
+000020   020   00000000 00000000 00000000 00000000  00000000 00000000 00000000 00000000   |................ ................|
+000040   040   00000000 00000000 00000000 00000000  00000000 00000000 00020000 00000018   |................ ................|
+000060   060   00020000 00000020 00020000 00000028  00020000 00000030 00020000 00000038   |................ ................|
+000080   080   00000000 00000000 00000000 00000000  00000000 00000000 00000000 00000000   |................ ................|
+0000A0   0A0   00000000 00000000 00000000 00000000  00000000 00000000 00000000 00000000   |................ ................|
+0000C0   0C0   00000000 00000000 00000000 00000000  00000000 00000000 00000000 00000000   |................ ................|
+0000E0   0E0   00000000 00000000 00000000 00000000  00000000 00000000 00000000 00000000   |................ ................|
+000100   100   00000000 00000000 00000000 00000000  00000000 00000000 00000000 00000000   |................ ................|
+000120   120   00000000 00000000 00000000 00000000  00000000 00000000 00000000 00000000   |................ ................|
+000140   140   00000000 00000000 00000000 00000000  00000000 00000000 00000000 00000000   |................ ................|
+000160   160   00000000 00000000 00000000 00000000  00000000 00000000 00000000 00000000   |................ ................|
+000180   180   00000000 00000000 00000000 00000000  00000000 00000000 00000000 00000000   |................ ................|
+0001A0   1A0   00000000 00000000 00000000 00000000  00000000 00000000 00000000 00000000   |................ ................|
+0001C0   1C0   00000000 00000000 00000000 00000000  00000000 00000000 00000000 00000000   |................ ................|
+0001E0   1E0   00000000 00000000 00000000 00000000  00000000 00000000 00000000 00000000   |................ ................|
+
+Region: ECHO
+
+002000   200   05C04810 C0DE9D00 10004710 C16A4720  C17C4740 C1BA9201 C0DC40B0 C0E09200   |............A¦.. A@. A.k... ...k.|
+002020   220   C116D24E C117C116 4120C0E6 50200048  9C001000 4710C16A 4720C17C 4740C1BA   |A.K+A.A....W&... ......A¦..A@. A.|
+002040   240   9D001000 4720C03E 4710C16A 4780C18E  D601C0E0 00449500 C0E14770 C1B09142   |..........A¦..A. O.....n.....A.j.|
+002060   260   C0E04770 C1B09104 C0E047E0 C03E4830  C0FE4B30 00464930 C1004780 C07CD503   |....A.j......... ........A....@N.|
+002080   280   C102C116 4780C166 9202C0DC 40B0C0E0  4030C0FC 4120C0F6 50200048 9C001000   |A.A...A.k... ...  ......6&.......|
+0020A0   2A0   4710C16A 4720C17C 4740C1BA 9D001000  4720C0AA 4710C16A 4780C18E D601C0E0   |..A¦..A@. A..... ......A¦..A.O...|
+0020C0   2C0   00449500 C0E14770 C1B09142 C0E04770  C1B09104 C0E047E0 C0AA47F0 C0140000   |..n.....A.j..... A.j........0....|
+0020E0   2E0   001F0000 00000000 01002108 40000007  0A002118 20000050 09002118 00000000   |............ ... .......&........|
+002100   300   00500004 98A489A3 C5D5E3C5 D97A4000  00000000 00000000 00000000 00000000   |.&..quitENTER: . ................|
+002120   320   00000000 00000000 00000000 00000000  00000000 00000000 00000000 00000000   |................ ................|
+002140   340   00000000 00000000 00000000 00000000  00000000 00000000 00000000 00000000   |................ ................|
+002160   360   00000000 00000000 8200C1CE 4010C1D4  9210C1D3 D600C1D3 C0DC8200 C1CE4010   |........b.A. .AM k.ALO.AL..b.A. .|
+002180   380   C1D49220 C1D3D600 C1D3C0DC 8200C1CE  4010C1D4 9230C1D3 D600C1D3 C0DCD201   |AMk.ALO.AL..b.A.  .AMk.ALO.AL..K.|
+0021A0   3A0   C1D4003A 9240C1D3 D600C1D3 C0DC8200  C1CED201 C1D4C0E0 47F0C1C0 D201C1D4   |AM..k ALO.AL..b. A.K.AM...0A.K.AM|
+0021C0   3C0   00449250 C1D3D600 C1D3C0DC 8200C1CE  00020000 00000000                     |..k&ALO.AL..b.A. ........        |
+ASMA Ver. 0.2.1  ECHO - INPUT/OUTPUT SUBROUTINES                                                    18 Oct 2021 11:03:00  Page    21
+
+   STMT                  FILE NAME
+
+1     /home/harold/simh/simh_tests/echo/echo.asm
+
+
+** NO ERRORS FOUND **
+
+[132] MNOTE *,ARCHLVL - ARCHITECTURE LEVEL SET - 1
+
