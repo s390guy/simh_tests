@@ -66,6 +66,7 @@ R15      EQU   15  Subroutine return register.  I/O routine is the caller
          SPACE 1
 * Disabled Wait State PSW's address field values used by the program:
 *    X'000000' - Successful execution of the program
+* Note: Restart interruptions are not available on S/360 systems.
 *    X'000018' - Unexpected External interruption occurred.
 *                Old External PSW at address X'18'
 *    X'000020' - Unexpected Supervisor interruption occurred.
@@ -80,9 +81,11 @@ R15      EQU   15  Subroutine return register.  I/O routine is the caller
 *    X'2xccuu' - Device or channel busy.            ccuu=Device Address
 *    X'3xccuu' - Device storing of CSW missed       ccuu=Device Address
 *    X'4xccuu' - Unexpected device interruption.    ccuu=Device Address
-*    X'5xddcc' - Console Device problem.  dd=device status, cc=channel status
+*    X'5xddcc' - Console Status problem.  dd=device status, cc=channel status
 *    X'6x00ss' - Console Device sense data.  ss=general sense byte
 *                Sense data reporting is not yet enabled.
+* Note: The 'x' in the above wait state codes indicates the program position
+* in which the error was detected.
          EJECT
 * See all object data and macro generated model statements in the listing
          PRINT DATA,GEN
@@ -106,7 +109,6 @@ PGMSECT  START X'2000',ECHO  Start a second region for the program itself
          USING ASA,0           Give me instruction access to the ASA CSECT
 PGMSTART BALR  R12,0           Establish my base register
          USING *,R12           Tell the assembler
-*         LPSW  DONE            Check memory before running
          SPACE 3
 * Determine if the console device, subchannel and channel are ready for use.
          LH    R1,CONDEV   Console device address in I/O inst. register
@@ -116,23 +118,94 @@ PGMSTART BALR  R12,0           Establish my base register
          BC    B'0100',CSWSTRD   ..No, CC=1 CSW stored in ASA at X'40'
 * Console device is available (CC=0)!
          TITLE 'ECHO - POSITION 01 - GET CONSOLE INPUT'     
-* Send HELLO WORLD message (this will be changed to instructions)
-ECHOLOOP DS    0H    Query operator and echo data
-         MVI   PGMRTN,HEADER     Displaying the query...
-         STH   R11,STATUS        Clear status for console I/O operation
+* Send operator prompt and accept the operator's input
+ECHOMAIN DS    0H    Query operator and echo data
+         MVI   PGMRTN,ECHOGET    Displaying the query...
          MVI   DATA,X'00'        Clear the input...
          MVC   DATA+1(L'DATA-1),DATA     ...I/O area.
          LA    R2,GETDATA        Locate the initial CCW
-         ST    R2,CAW            Tell the I/O request its address in ASA
+         BAL   R15,DOIO    Request console input
+         B     ECHOMAIN          ..Ignore ATTN from operator (FIXME!!)
+         B     ECHOMAIN          ..Ignore CANCEL from the operator (FIXME!!)
+         B     ECHOMAIN          ..Ignore program interrupt  (FIXME!!) 
+*                                ..On success, echo the operator's response
+         SPACE 1
+* Calculate the length of the operator's input string (may be zero).
+         LH    R3,INLEN          Fetch the lengh of the input area
+         SH    R3,CSW+6          Calculate actual bytes read
+         BZ    ECHOCR            If no data, operator just hit ENTER
+         CH    R3,QUITLEN        Was only four bytes entered?
+         BNE   CONSECHO          ..No, echo the input
+         SPACE 1
+CKQUIT   DS    0H   Check if quit was entered (only when four bytes entered)e
+         CLC   QUIT,DATA         Did operator enter quit
+         BE    FINISH            ..Yes, end the program.
+*                                ..No, echo the operator's input (fall through)
+         TITLE 'ECHO - POSITION 02 - ECHO INPUT BACK TO THE CONSOLE'
+*
+* Echo operator's input data on the console
+*
+CONSECHO DS    0H   Echo operator's input back to the operator
+         MVI   PGMRTN,ECHODATA   Displaying the query response..
+         STH   R3,PUTLEN         Update the CCW with the actual output length
+         LA    R2,PUTDATA        Locate the initial CCW
+         BAL   R15,DOIO          Echo the operator's input
+         B     ATTNHND           ..Ignore ATTN from operator (FIXME!!)
+         B     ECHOMAIN          ..Ignore CANCEL from the operator (FIXME!!)
+         B     ECHOMAIN          ..Ignore program interrupt FIXME!!) 
+         B     ECHOMAIN          On success, return to the main echo loop
+         SPACE 1
+ECHOCR   DS    0H   Simply echo a carriage return (also test I/O subroutine)
+* Note: a different channel program is required to handle the case where the
+* operator has hit only the ENTER key.  This results in a calculated length
+* of zero (detected above).  Zero can not be used as the length of a device
+* directed CCW.  This logic (functionaly identical to the preceding logic in
+* CONSECHO)transmits one byte of data, a new line (carriage return) character
+* without the CCW itself adding the carriage return.  This logic has a CCW
+* lengthfield of one, which IS valid.
+         MVI   PGMRTN,ECHOCRCH   Displaying the query response, just a CR
+         LA    R2,PUTCR          Point to the CCW that outputs just a CR
+         BAL   R15,DOIO          Use subroutine to perform the I/O
+         B     ECHOMAIN          ..Ignore ATTN from operator
+         B     ECHOMAIN          ..Ignore CANCEL from the operator
+         B     ECHOMAIN          ..Ignore program interrupt 
+         B     ECHOMAIN          On success, return to the main echo loop
+         TITLE 'ECHO - ATTN, CANCEL HANDLERS'
+ATTNHND  DS    0H   Display on the console the detection of an ATTN
+         MVI   PGMRTN,ATTNPOS    ATTN detected string
+         LA    R2,PUTATTN        Use the ATTN detected CCW and data area
+         BAL   R15,DOIO          Use subroutine to perform the I/O
+         B     ECHOMAIN          ..Ignore ATTN from operator
+         B     ECHOMAIN          ..Ignore CANCEL from the operator
+         B     ECHOMAIN          ..Ignore program interrupt 
+         B     ECHOMAIN          On success, return to the main echo loop
+         TITLE 'ECHO - INPUT/OUTPUT ROUTINE'
+*
+* CONSOLE INPUT/OUTPUT ROUTINE
+*
+* Register Usage:
+*  R1  - Device address performing the I/O in low-order 16 bits
+*  R2  - Address of the first CCW of the I/O request, bits 0-7 zeros, 8-31 address
+*  R11 - Zero (0), used to clear accumulated status field
+*  R15 - Routine return address:
+* Return Conventions:
+*    R15+0   ATTN signaled by operator
+*    R15+4   CANCEL signaled by operator
+*    R15+8   Operator interrupted program (uses external interruption)
+*    R15+12  Normal termination
+         SPACE 1
+DOIO     DS    0H
+         STH   R11,STATUS      Clear status for console I/O operation
+         ST    R2,CAW          Tell the I/O request its address in ASA
          SIO   0(R1)       Request console channel program to start, did it?
          BC    B'0001',DEVNOAVL  ..No, CC=3 don't know why, but tell someone.
          BC    B'0010',DEVBUSY   ..No, CC=2 console device or channel is busy
          BC    B'0100',CSWSTRD   ..No, CC=1 CSW stored in ASA at X'40'
 * Transfer initiated (CC=0)...
-POLL1    TIO   0(R1)             Test the I/O progress.
-         BC    B'0010',POLL1     CC=2, data still being sent, cont. polling
-         BC    B'0001',DEVNOAVL  CC=3 don't know why, but tell someone.
-         BC    B'1000',NOCSW     CC=0 missed CSW, don't know why abort
+POLL     TIO   0(R1)             Test the I/O progress.
+         BC    B'0010',POLL      CC=2, data still being sent, cont. polling
+         BC    B'0001',DEVNOAVL  CC=3, don't know why, but tell someone.
+         BC    B'1000',NOCSW     CC=0, missed CSW, don't know why abort
 * CSW stored (CC=1), analyze for result.
          OC    STATUS,CSW+4      Accummulate Device and Channel status
          CLI   STATUS+1,X'00'    Did the channel have a problem?
@@ -140,84 +213,73 @@ POLL1    TIO   0(R1)             Test the I/O progress.
 * Test for abnormal status for a console device
          TM    STATUS,X'42'      Was a device error reported?
 * ATTN, X'80', and UNIT EXCEPTION, X'01', are treated as normal.  ATTN is
-* generated by the operator hitting the ATTN key.  And UNIT EXCEPTION is
+* generated by the operator hitting the ATTN key.  UNIT EXCEPTION is
 * generated by the operator hitting the CANCEL key.  Not all console
-* emulations support both possible actions by the operator.
+* emulations support these operator actions.
 *
-* Channel end, control unit end and busy are ignored.  
+* Channel end, control unit end and busy are ignored.
          BNZ   CSWACCUM          ..Yes, end with a device/channel error
          TM    STATUS,X'04'      Device finally done?
-         BNO   POLL1             ..No, Check again....
+         BNO   POLL              ..No, Check again...
          SPACE 1
-* TODO: Add logic to handle ATTN and CANCEL from the operator
-         LH    R3,INLEN          Fetch the lengh of the input area
-         SH    R3,CSW+6          Calculate actual bytes read
-         CH    R3,QUITLEN        Was only four bytes entered?
-         BE    CKQUIT
-         SPACE 1
-CKQUIT   DS    0H   Check if operator entered quit
-         CLC   QUIT,DATA         Did operator enter quit
-         BE    FINISH            ..Yes, end the program.
-         SPACE 1
-*
-* No, echo operator's input data on the console
-*
-         MVI   PGMRTN,ECHODATA   Displaying the query..
-         STH   R11,STATUS        Clear status for console I/O operation
-         STH   R3,PUTLEN         Update the CCW with the actual output length
-         LA    R2,PUTDATA        Locate the initial CCW
-         ST    R2,CAW            Tell the I/O request its address in ASA
-         SIO   0(R1)       Request console channel program to start, did it?
-         BC    B'0001',DEVNOAVL  ..No, CC=3 don't know why, but tell someone.
-         BC    B'0010',DEVBUSY   ..No, CC=2 console device or channel is busy
-         BC    B'0100',CSWSTRD   ..No, CC=1 CSW stored in ASA at X'40'
-* Transfer initiated (CC=0)...
-POLL2    TIO   0(R1)             Test the I/O progress.
-         BC    B'0010',POLL2     CC=2, data still being sent, cont. polling
-         BC    B'0001',DEVNOAVL  CC=3 don't know why, but tell someone.
-         BC    B'1000',NOCSW     CC=0 missed CSW, don't know why abort
-* CSW stored (CC=1), analyze for result.
-         OC    STATUS,CSW+4      Accummulate Device and Channel status
-         CLI   STATUS+1,X'00'    Did the channel have a problem?
-         BNE   CSWACCUM          ..Yes, end with a device/channel error
-* Test for abnormal status for a console device (see above for details)
-         TM    STATUS,X'42'      Was a device error reported?
-         BNZ   CSWACCUM          ..Yes, end with a device/channel error
-         TM    STATUS,X'04'      Device finally done?
-         BNO   POLL2             ..No, continue waiting for device end
-         B     ECHOLOOP          ..Yes, get operator's next output
-         SPACE 3
-* Program position used in building abend address
-INIT     EQU   X'00'        Program initialization
-HEADER   EQU   X'01'        Operator prompt and input retrieved
-ECHODATA EQU   X'02'        Echoing data from the operator
-PGMRTN   DC    AL1(INIT)    Initialize program position data
-         SPACE 3
-*
-* I/O related information
-*
-         DS    0H          Align half words
-CONDEV   DC    XL2'001F'   Console device address
-STATUS   DC    XL2'0000'   Used to accumulate unit and channel status
-         SPACE 3
+* Check for normal conditions and return to caller
+         TM    STATUS,X'81'      Normal termination?
+         BZ    12(R15)           ..Yes, return to caller +12
+* No means either ATTN (X'80') or UNIT EXCEPTION (X'01') status was present
+* or both.  These tests give precedence to ATTN status over UNIT EXCEPTION.
+         TM    STATUS,X'80'      Was ATTN status presented?
+         BOR   R15               ..Yes, return to caller +0, ATTN
+* This leaves only UNIT EXCEPTION was present in the status
+         B     4(R15)            ..No, return to caller +4, CANCEL
+         TITLE 'ECHO - DATA AREAS'
 *
 * Channel Command Words
 *
+         SPACE 1
+* Doubleword aligned data
 GETDATA  CCW   X'01',ENTER,X'40',L'ENTER   Display 'ENTER: ' on console
 *              Command-chain (X'40') to the next CCW
          CCW   X'0A',DATA,X'20',L'DATA     Read operator's data
 *              Suppress Incorrect Length Indicator - operator's data varies
          SPACE 1
+PUTATTN  CCW   X'09',ATTNSTR,0,L'ATTNSTRL  Display ATTN string
+         SPACE 1
 PUTDATA  CCW   X'09',DATA,0,0              Echo operator's data
          ORG   PUTDATA+6
 PUTLEN   DS    HL2                         Echo'd data's length
          SPACE 1
-INLEN    DC    Y(L'DATA)     Input data length (Could also use prev. CCW)
-QUITLEN  DC    Y(L'QUIT)     Length of quit literal
+PUTCR    CCW   X'01',CRDATA,X'00',L'CRDATA   Echo just a CR
          SPACE 1
-QUIT     DC    C'quit'       quit (terminates the program)
-ENTER    DC    C'ENTER: '
-         DS    D
+*
+* I/O related information
+*
+* Half-word aligned data
+         DS    0H          Align half words
+CONDEV   DC    XL2'001F'   Console device address
+STATUS   DC    XL2'0000'   Used to accumulate unit and channel status
+         SPACE 1
+INLEN    DC    Y(L'DATA)   Input data length (Could also use prev. CCW)
+QUITLEN  DC    Y(L'QUIT)   Length of quit literal
+         SPACE 3
+* Unaligned data
+         SPACE 1
+* Program position used in building abend address
+INIT     EQU   X'00'        Program initialization
+ECHOGET  EQU   X'01'        Operator prompt and input retrieved
+ECHODATA EQU   X'02'        Echoing data from the operator
+ECHOCRCH EQU   X'03'        Echo just a new line character (carriage return)
+ATTNPOS  EQU   X'04'        ATTN handler
+PGMRTN   DC    AL1(INIT)    Initialize program position data
+         SPACE 1
+* ECHO program data areas
+ATTNSTR  DC    XL1'15',C'** ATTN **'
+ATTNSTRL EQU   *-ATTNSTR
+CRDATA   DC    XL1'15'      Just a new line (carriage return) character
+ENTER    DC    C'ENTER: '   Operator prompt
+QUIT     DC    C'quit'      quit (terminates the program)
+**** Debug harness
+*         DS    D       Uncomment this statement to separate constants
+**** Debug harness
 DATA     DC    XL80'00'
          TITLE 'ECHO - PROGRAM TERMINATIONS'
 *
@@ -237,7 +299,7 @@ FINISH   LPSW  DONE     Normally Terminate the program
 *   R1  - Device Channel/Unit address
 *   R12 - Global program base address
 * Abnormal Termination:
-*    Format 1 ABEND code X'10'
+*    Format 1 ABEND code X'1x'
          SPACE 1
 DEVNOAVL DS    0H
          STH   1,FMT1CUU         Set the failing device address
@@ -252,7 +314,7 @@ DEVNOAVL DS    0H
 *   R1  - Device Channel/Unit address
 *   R12 - Global program base address
 * Abnormal Termination:
-*    Format 1 ABEND code X'20
+*    Format 1 ABEND code X'2x
          SPACE 1
 DEVBUSY  DS    0H
          STH   1,FMT1CUU         Set the failing device address
@@ -261,18 +323,19 @@ DEVBUSY  DS    0H
          LPSW  DONE              End execution abnormally
          SPACE 1
 *
-* REPORT MISSING STORING OF CSW - Uses Format 1 ABEND
+* REPORT STORING OF CSW MISSING - Uses Format 1 ABEND
 *
 * Register usage:
 *   R1  - Device Channel/Unit address
 *   R12 - Global program base address
 * Abnormal Termination:
-*    Format 1 ABEND code X'30
+*    Format 1 ABEND code X'3x
          SPACE 1
 NOCSW    DS    0H
          STH   1,FMT1CUU         Set the failing device address
          MVI   FMT1CODE,X'30'    Set the abend code
          OC    FMT1CODE,PGMRTN   Set where the abend was detected
+         LPSW  DONE              End execution abnormally
          SPACE 3
 *
 * REPORT UNEXPECTED DEVICE RESPONSE - Uses Format 1 ABEND PSW
@@ -287,7 +350,7 @@ DEVUNKN  DS    0H
          MVC   FMT1CUU,IOOPSW+2 Set the unexpected device address
          MVI   FMT1CODE,X'40'   Set the abend code
          OC    FMT1CODE,PGMRTN  Set where the abend was detected
-         LPSW  DONE            End execution abnormally
+         LPSW  DONE             End execution abnormally
          SPACE 3      
 *
 * REPORT CONSOLE DEVICE OR CHANNEL ERROR STATUS - Uses Format 2 ABEND PSW
@@ -316,11 +379,11 @@ CODE50   DS    0H
 *   R1  - Device Channel/Unit address
 *   R12 - Global program base address
 * Abnormal Termination:
-*    Format 3 ABEND code X'50'
+*    Format 3 ABEND code X'6x'
 *
 *ABENDSNS DS    0H
 *         MVC   FMT3SNS,SENSDATA   Move the generic sense byte abend PSW
-*         MVI   FMT3CODE,X'50'     Set the abend code
+*         MVI   FMT3CODE,X'60'     Set the abend code
 *         LPSW  DONE
          SPACE 3
 *
@@ -330,11 +393,11 @@ DONE     PSW360 0,0,2,0,0
          ORG  *-3
 FORMAT   DS   0AL3
 * Format 1 ABEND FORMAT
-FMT1CODE DS   X'00'   aa - Abend codes: 1x, 2x, 3x - x=program position
+FMT1CODE DS   X'00'   aa - Abend codes: 1x, 2x, 3x, 4x - x=program position
 FMT1CUU  DS   H'0'    ccuu - address of device causing the termination
          ORG  FORMAT
 * Format 2 ABEND FORMAT
-FMT2CODE DS   X'00'   aa - Abend Code: 4x - x=program position
+FMT2CODE DS   X'00'   aa - Abend Code: 5x -          x=program position
 FMT2STAT DS   H'00'   ddcc - dd=console device status, cc=channel status
          ORG  FORMAT
 * Format 3 ABEND FORMAT
@@ -362,7 +425,7 @@ FMT3SNS  DS   X'00'   ss - console device generic sense data
 *         B     DEVUNKN              ..No, end program with an error
 *         SPACE 1
 *WAIT     PSW360 X'F8',0,2,0,0       Causes CPU to wait for I/O interruption
-*                                   Channels 0-4 enabled for interrupts
+*                                Channels 0-4 enabled for interrupts
 *CONT     PSW360 0,0,0,0,IODONE      Causes the CPU to continue after waiting
 *IOTRAP   PSW360 0,0,2,0,X'38'       I/O trap New PSW (restored after I/O)
          SPACE 3
