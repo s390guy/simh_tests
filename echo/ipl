@@ -36,4 +36,4 @@ STARTUP=${TEST}/echo.ini      # Simulator start up file
 echo "at the SimH prompt type: boot cdr0"
 echo "to exit the program type: quit"
 echo "to exit the simulator type: quit"
-${SIMH} ${STARTUP}
+${SIMH} ${STARTUP} 2>&1 |tee simh360-${sfx}.log

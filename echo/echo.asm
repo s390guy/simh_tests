@@ -125,9 +125,10 @@ ECHOMAIN DS    0H    Query operator and echo data
          MVC   DATA+1(L'DATA-1),DATA     ...I/O area.
          LA    R2,GETDATA        Locate the initial CCW
          BAL   R15,DOIO    Request console input
-         B     ECHOMAIN          ..Ignore ATTN from operator (FIXME!!)
-         B     ECHOMAIN          ..Ignore CANCEL from the operator (FIXME!!)
-         B     ECHOMAIN          ..Ignore program interrupt  (FIXME!!) 
+         B     CSWACCUM          ..Treat ATTN from operator as an error
+         B     CNCLHND           ..Accept CANCEL and wait for ATTN
+* IBM360 does not generate a UNIT EXCEPTION. Type 'cancel'
+         B     ECHOMAIN          ..Ignore program interrupt
 *                                ..On success, echo the operator's response
          SPACE 1
 * Calculate the length of the operator's input string (may be zero).
@@ -150,12 +151,12 @@ CONSECHO DS    0H   Echo operator's input back to the operator
          STH   R3,PUTLEN         Update the CCW with the actual output length
          LA    R2,PUTDATA        Locate the initial CCW
          BAL   R15,DOIO          Echo the operator's input
-         B     ATTNHND           ..Ignore ATTN from operator (FIXME!!)
-         B     ECHOMAIN          ..Ignore CANCEL from the operator (FIXME!!)
+         B     CSWACCUM          ..Treat ATTN from operator as an error
+         B     ECHOMAIN          ..Ignore CANCEL from operator during echo
          B     ECHOMAIN          ..Ignore program interrupt FIXME!!) 
          B     ECHOMAIN          On success, return to the main echo loop
          SPACE 1
-ECHOCR   DS    0H   Simply echo a carriage return (also test I/O subroutine)
+ECHOCR   DS    0H   Simply echo a carriage return
 * Note: a different channel program is required to handle the case where the
 * operator has hit only the ENTER key.  This results in a calculated length
 * of zero (detected above).  Zero can not be used as the length of a device
@@ -166,16 +167,26 @@ ECHOCR   DS    0H   Simply echo a carriage return (also test I/O subroutine)
          MVI   PGMRTN,ECHOCRCH   Displaying the query response, just a CR
          LA    R2,PUTCR          Point to the CCW that outputs just a CR
          BAL   R15,DOIO          Use subroutine to perform the I/O
-         B     ECHOMAIN          ..Ignore ATTN from operator
+         B     CSWACCUM          ..Treat ATTN from operator as an error
          B     ECHOMAIN          ..Ignore CANCEL from the operator
          B     ECHOMAIN          ..Ignore program interrupt 
          B     ECHOMAIN          On success, return to the main echo loop
-         TITLE 'ECHO - ATTN, CANCEL HANDLERS'
-ATTNHND  DS    0H   Display on the console the detection of an ATTN
-         MVI   PGMRTN,ATTNPOS    ATTN detected string
-         LA    R2,PUTATTN        Use the ATTN detected CCW and data area
+         TITLE 'ECHO - CANCEL/ATTN HANDLERS'
+CNCLHND  DS    0H   Handle a CANCEL (UNIT EXCEPTION) from the console
+         MVI   PGMRTN,CNCLPOS    CANCEL being handled
+         LA    R2,PUTCNCL        Display that a CANCEL was detected
+         BAL   R15,DOIO          Perform the console display
+         B     CSWACCUM          ..Treat ATTN from operator as an error
+         B     ATTNWAIT          ..Ignore CANCEL from the operator
+         B     ATTNWAIT          ..Ignore program interrupt 
+* Wait for an I/O interruption
+ATTNWAIT BAL   R15,IOWAIT        Wait for an I/O interruption
+         TM    CSW+4,X'80'       Does the interrupt contain an ATTN?
+         BNO   ATTNWAIT          ..No, continue waiting
+* ATTENTION detected
+         LA    R2,PUTATTN        Display that an ATTN was detected
          BAL   R15,DOIO          Use subroutine to perform the I/O
-         B     ECHOMAIN          ..Ignore ATTN from operator
+         B     CSWACCUM          ..Treat ATTN from operator as an error
          B     ECHOMAIN          ..Ignore CANCEL from the operator
          B     ECHOMAIN          ..Ignore program interrupt 
          B     ECHOMAIN          On success, return to the main echo loop
@@ -231,6 +242,30 @@ POLL     TIO   0(R1)             Test the I/O progress.
          BOR   R15               ..Yes, return to caller +0, ATTN
 * This leaves only UNIT EXCEPTION was present in the status
          B     4(R15)            ..No, return to caller +4, CANCEL
+         TITLE 'ECHO - INTERRUPTION HANDLERS AND WAIT ROUTINES'
+*
+* I/O WAIT SUBROUTINE
+*
+*  Register usage:
+*    R1  - Device Channel/Unit address
+*    R12 - Global program base address
+*    R15 - Subroutine return address
+*
+*  Abnormal Terminations:
+*    Interrupt from unexpected device received.
+IOWAIT   MVC   IONPSW(8),CONT  Set up continuation PSW for after I/O interrupt
+         LPSW  WAIT       Wait for I/O interruption and CSW from channel
+IODONE   EQU   *          The bare-metal program continues here after I/O
+         MVC   IONPSW(8),IOTRAP     Restore I/O trap PSW
+*   Did the interruption come from the expected device?
+         CH    R1,IOOPSW+2          Is the interrupt from the expected device?
+         BER   R15                  ..Yes, return to caller
+         B     DEVUNKN              ..No, end program with an error
+         SPACE 1
+WAIT     PSW360 X'F8',0,2,0,0       Causes CPU to wait for I/O interruption
+*                                   Channels 0-4 enabled for interrupts
+CONT     PSW360 0,0,0,0,IODONE      Causes the CPU to continue after waiting
+IOTRAP   PSW360 0,0,2,0,X'38'       I/O trap New PSW (restored after I/O)
          TITLE 'ECHO - DATA AREAS'
 *
 * Channel Command Words
@@ -243,6 +278,8 @@ GETDATA  CCW   X'01',ENTER,X'40',L'ENTER   Display 'ENTER: ' on console
 *              Suppress Incorrect Length Indicator - operator's data varies
          SPACE 1
 PUTATTN  CCW   X'09',ATTNSTR,0,L'ATTNSTRL  Display ATTN string
+         SPACE 1
+PUTCNCL  CCW   X'09',CNCLSTR,0,L'CNCLSTRL  Display the CANCEL string
          SPACE 1
 PUTDATA  CCW   X'09',DATA,0,0              Echo operator's data
          ORG   PUTDATA+6
@@ -269,11 +306,14 @@ ECHOGET  EQU   X'01'        Operator prompt and input retrieved
 ECHODATA EQU   X'02'        Echoing data from the operator
 ECHOCRCH EQU   X'03'        Echo just a new line character (carriage return)
 ATTNPOS  EQU   X'04'        ATTN handler
+CNCLPOS  EQU   X'05'        CANCEL handler
 PGMRTN   DC    AL1(INIT)    Initialize program position data
          SPACE 1
 * ECHO program data areas
 ATTNSTR  DC    XL1'15',C'** ATTN **'
 ATTNSTRL EQU   *-ATTNSTR
+CNCLSTR  DS    XL1'15',C'** CANCEL **'
+CNCLSTRL EQU   *-CNCLSTR
 CRDATA   DC    XL1'15'      Just a new line (carriage return) character
 ENTER    DC    C'ENTER: '   Operator prompt
 QUIT     DC    C'quit'      quit (terminates the program)
