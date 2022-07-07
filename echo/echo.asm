@@ -110,6 +110,25 @@ PGMSECT  START X'2000',ECHO  Start a second region for the program itself
 PGMSTART BALR  R12,0           Establish my base register
          USING *,R12           Tell the assembler
          SPACE 3
+* Most systems pass control to the CPU following receipt of CE and DE from
+* the IPL device.  On some systems, the transfer occurs upon receipt of
+* CE allowing the device to later supply the DE.  The following code is
+* used to effect the same wait for DE that usually happens by the hardware
+* executing the IPL function.
+         LH    1,2      Get the card reader device address (stored by IPL)
+IPLWAIT  TIO   0(1)     Request the IPL device status
+         BC    B'0001',DEVNOAVL  If CC=3, device unavailable.  Tell someone.
+* IF CC=2 or 1, busy or CSW stored, wait until the device is available.
+* The assumption is that the CSW contains the DE that the program is waiting
+* to see.  The program does not really care about the received status.  
+* It is just looking for the IPL device to be available.
+         BC    B'0110',IPLWAIT
+* CC=0, available, allows the program to continue.
+         SPACE 1
+* Note: For systems the do NOT transfer control to the CPU until DE IS
+* received, the above sequence will return CC=0 on the first TIO and proceed
+* into the program as it would normally.
+         SPACE 3
 * Determine if the console device, subchannel and channel are ready for use.
          LH    R1,CONDEV   Console device address in I/O inst. register
          TIO   0(R1)       Determine if the console is there

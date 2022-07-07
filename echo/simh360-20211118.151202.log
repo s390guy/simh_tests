@@ -1,0 +1,24 @@
+Mem size=4000
+
+IBM 360 simulator V4.0-0 Current        git commit id: 3cce1315
+simh startup file echo.ini
+CPU     idle disabled
+        16KB, IBM360, PROT
+        UNIV, TIMER, NOEXT
+INQ     attached to (null), DEV=01f
+Set dev CDR c
+/home/harold/simh/simh_tests/echo/echo_sli.ini-39> attach cdr0 -e -f ebcdic echo_sli.deck
+CDR0: 22 card Deck Loaded from echo_sli.deck
+CDR0    attached to -E -F EBCDIC echo_sli.deck, read only, EBCDIC format, DEV=00c
+[?1034hsim> boot cdr0
+ENTER: I hello
+R hello
+R ENTER: I 
+R 
+R ENTER: I four
+R four
+R ENTER: I quit
+
+Uninterruptable wait PSW=00020080 80000000
+sim> exit
+Goodbye

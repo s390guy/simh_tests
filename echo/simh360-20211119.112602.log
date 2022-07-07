@@ -1,0 +1,144 @@
+/home/harold/simh/simh_tests/echo/echo.ini-26> set debug stderr
+Debug output to "STDERR"
+Debug output to "STDERR" at Fri Nov 19 11:26:02 2021
+IBM 360 simulator V4.0-0 Current        git commit id: 3cce1315
+Mem size=4000
+CPU     idle disabled
+        16KB, IBM360, PROT
+        UNIV, TIMER, NOEXT
+INQ     attached to (null), DEV=01f
+Set dev CDR c
+/home/harold/simh/simh_tests/echo/echo.ini-39> attach cdr0 -e -f ebcdic echo.deck
+CDR0: 22 card Deck Loaded from echo.deck
+DBG(0)> CPU EXP: set_devattn(c, 4) ffff
+CDR0    attached to -E -F EBCDIC echo.deck, read only, EBCDIC format, DEV=00c
+
+IBM 360 simulator V4.0-0 Current        git commit id: 3cce1315
+simh startup file echo.ini
+/home/harold/simh/simh_tests/echo/echo.ini-26> set debug stderr
+Debug output to "STDERR"
+CPU     idle disabled
+        16KB, IBM360, PROT
+        UNIV, TIMER, NOEXT
+INQ     attached to (null), DEV=01f
+Set dev CDR c
+/home/harold/simh/simh_tests/echo/echo.ini-39> attach cdr0 -e -f ebcdic echo.deck
+CDR0: 22 card Deck Loaded from echo.deck
+CDR0    attached to -E -F EBCDIC echo.deck, read only, EBCDIC format, DEV=00c
+[?1034hsim> boot cdr0
+sim> boot cdr0
+DBG(13400)> CPU DETAIL: chan_write_end
+DBG(13400)> CPU DETAIL: chan_end(c, c) 0 6000 0000
+DBG(13400)> CPU DETAIL: chan_end(c, c) c00 4000 end
+DBG(13400)> CPU EXP: Scan(0 c c00 4000) Cend
+DBG(13400)> CPU CMD: Channel read ccw  00c 000008 02002388
+DBG(13400)> CPU CMD: Channel read ccw2 00c 00000c 40000050
+DBG(32300)> CPU DETAIL: chan_end(c, c) 0 4000 0000
+DBG(32300)> CPU DETAIL: chan_end(c, c) c00 4000 end
+DBG(32300)> CPU EXP: Scan(0 c c00 4000) Cend
+DBG(32300)> CPU CMD: Channel read ccw  00c 000010 08002388
+DBG(32300)> CPU CMD: Channel read ccw  00c 002388 02002000
+DBG(32300)> CPU CMD: Channel read ccw2 00c 00238c 40000050
+DBG(51200)> CPU DETAIL: chan_end(c, c) 0 4000 0000
+DBG(51200)> CPU DETAIL: chan_end(c, c) c00 4000 end
+DBG(51200)> CPU EXP: Scan(0 c c00 4000) Cend
+DBG(51200)> CPU CMD: Channel read ccw  00c 002390 02002050
+DBG(51200)> CPU CMD: Channel read ccw2 00c 002394 40000050
+DBG(70100)> CPU DETAIL: chan_end(c, c) 0 4000 0000
+DBG(70100)> CPU DETAIL: chan_end(c, c) c00 4000 end
+DBG(70100)> CPU EXP: Scan(0 c c00 4000) Cend
+DBG(70100)> CPU CMD: Channel read ccw  00c 002398 020020a0
+DBG(70100)> CPU CMD: Channel read ccw2 00c 00239c 40000050
+DBG(89000)> CPU DETAIL: chan_end(c, c) 0 4000 0000
+DBG(89000)> CPU DETAIL: chan_end(c, c) c00 4000 end
+DBG(89000)> CPU EXP: Scan(0 c c00 4000) Cend
+DBG(89000)> CPU CMD: Channel read ccw  00c 0023a0 020020f0
+DBG(89000)> CPU CMD: Channel read ccw2 00c 0023a4 40000050
+DBG(107900)> CPU DETAIL: chan_end(c, c) 0 4000 0000
+DBG(107900)> CPU DETAIL: chan_end(c, c) c00 4000 end
+DBG(107900)> CPU EXP: Scan(0 c c00 4000) Cend
+DBG(107900)> CPU CMD: Channel read ccw  00c 0023a8 02002140
+DBG(107900)> CPU CMD: Channel read ccw2 00c 0023ac 40000050
+DBG(126800)> CPU DETAIL: chan_end(c, c) 0 4000 0000
+DBG(126800)> CPU DETAIL: chan_end(c, c) c00 4000 end
+DBG(126800)> CPU EXP: Scan(0 c c00 4000) Cend
+DBG(126800)> CPU CMD: Channel read ccw  00c 0023b0 02002190
+DBG(126800)> CPU CMD: Channel read ccw2 00c 0023b4 40000050
+DBG(145700)> CPU DETAIL: chan_end(c, c) 0 4000 0000
+DBG(145700)> CPU DETAIL: chan_end(c, c) c00 4000 end
+DBG(145700)> CPU EXP: Scan(0 c c00 4000) Cend
+DBG(145700)> CPU CMD: Channel read ccw  00c 0023b8 020021e0
+DBG(145700)> CPU CMD: Channel read ccw2 00c 0023bc 40000050
+DBG(164600)> CPU DETAIL: chan_end(c, c) 0 4000 0000
+DBG(164600)> CPU DETAIL: chan_end(c, c) c00 4000 end
+DBG(164600)> CPU EXP: Scan(0 c c00 4000) Cend
+DBG(164600)> CPU CMD: Channel read ccw  00c 0023c0 02002230
+DBG(164600)> CPU CMD: Channel read ccw2 00c 0023c4 40000050
+DBG(183500)> CPU DETAIL: chan_end(c, c) 0 4000 0000
+DBG(183500)> CPU DETAIL: chan_end(c, c) c00 4000 end
+DBG(183500)> CPU EXP: Scan(0 c c00 4000) Cend
+DBG(183500)> CPU CMD: Channel read ccw  00c 0023c8 020023d8
+DBG(183500)> CPU CMD: Channel read ccw2 00c 0023cc 40000050
+DBG(202400)> CPU DETAIL: chan_end(c, c) 0 4000 0000
+DBG(202400)> CPU DETAIL: chan_end(c, c) c00 4000 end
+DBG(202400)> CPU EXP: Scan(0 c c00 4000) Cend
+DBG(202400)> CPU CMD: Channel read ccw  00c 0023d0 080023d8
+DBG(202400)> CPU CMD: Channel read ccw  00c 0023d8 02002280
+DBG(202400)> CPU CMD: Channel read ccw2 00c 0023dc 40000050
+DBG(221300)> CPU DETAIL: chan_end(c, c) 0 4000 0000
+DBG(221300)> CPU DETAIL: chan_end(c, c) c00 4000 end
+DBG(221300)> CPU EXP: Scan(0 c c00 4000) Cend
+DBG(221300)> CPU CMD: Channel read ccw  00c 0023e0 020022d0
+DBG(221300)> CPU CMD: Channel read ccw2 00c 0023e4 40000050
+DBG(240200)> CPU DETAIL: chan_end(c, c) 0 4000 0000
+DBG(240200)> CPU DETAIL: chan_end(c, c) c00 4000 end
+DBG(240200)> CPU EXP: Scan(0 c c00 4000) Cend
+DBG(240200)> CPU CMD: Channel read ccw  00c 0023e8 02002320
+DBG(240200)> CPU CMD: Channel read ccw2 00c 0023ec 60000018
+DBG(253600)> CPU DETAIL: chan_write_end
+DBG(253600)> CPU DETAIL: chan_end(c, c) 0 6000 0000
+DBG(253600)> CPU DETAIL: chan_end(c, c) c00 4000 end
+DBG(253600)> CPU EXP: Scan(0 c c00 4000) Cend
+DBG(253600)> CPU CMD: Channel read ccw  00c 0023f0 02000000
+DBG(253600)> CPU CMD: Channel read ccw2 00c 0023f4 40000050
+DBG(272500)> CPU DETAIL: chan_end(c, c) 0 4000 0000
+DBG(272500)> CPU DETAIL: chan_end(c, c) c00 4000 end
+DBG(272500)> CPU EXP: Scan(0 c c00 4000) Cend
+DBG(272500)> CPU CMD: Channel read ccw  00c 0023f8 02000050
+DBG(272500)> CPU CMD: Channel read ccw2 00c 0023fc 40000050
+DBG(291400)> CPU DETAIL: chan_end(c, c) 0 4000 0000
+DBG(291400)> CPU DETAIL: chan_end(c, c) c00 4000 end
+DBG(291400)> CPU EXP: Scan(0 c c00 4000) Cend
+DBG(291400)> CPU CMD: Channel read ccw  00c 002400 020000a0
+DBG(291400)> CPU CMD: Channel read ccw2 00c 002404 40000050
+DBG(310300)> CPU DETAIL: chan_end(c, c) 0 4000 0000
+DBG(310300)> CPU DETAIL: chan_end(c, c) c00 4000 end
+DBG(310300)> CPU EXP: Scan(0 c c00 4000) Cend
+DBG(310300)> CPU CMD: Channel read ccw  00c 002408 020000f0
+DBG(310300)> CPU CMD: Channel read ccw2 00c 00240c 40000050
+DBG(329200)> CPU DETAIL: chan_end(c, c) 0 4000 0000
+DBG(329200)> CPU DETAIL: chan_end(c, c) c00 4000 end
+DBG(329200)> CPU EXP: Scan(0 c c00 4000) Cend
+DBG(329200)> CPU CMD: Channel read ccw  00c 002410 02000140
+DBG(329200)> CPU CMD: Channel read ccw2 00c 002414 40000050
+DBG(348100)> CPU DETAIL: chan_end(c, c) 0 4000 0000
+DBG(348100)> CPU DETAIL: chan_end(c, c) c00 4000 end
+DBG(348100)> CPU EXP: Scan(0 c c00 4000) Cend
+DBG(348100)> CPU CMD: Channel read ccw  00c 002418 02000190
+DBG(348100)> CPU CMD: Channel read ccw2 00c 00241c 40000050
+DBG(367000)> CPU DETAIL: chan_end(c, c) 0 4000 0000
+DBG(367000)> CPU DETAIL: chan_end(c, c) c00 4000 end
+DBG(367000)> CPU EXP: Scan(0 c c00 4000) Cend
+DBG(367000)> CPU CMD: Channel read ccw  00c 002420 020001e0
+DBG(367000)> CPU CMD: Channel read ccw2 00c 002424 20000020
+DBG(381200)> CPU DETAIL: chan_write_end
+DBG(381200)> CPU DETAIL: chan_end(c, c) 0 2000 0000
+DBG(381200)> CPU DETAIL: chan_end(c, c) c00 0000 end
+DBG(381200)> CPU EXP: Scan(0 c c00 0) Cend
+DBG(381200)> CPU EXP: Scan(0 c c00 8000 0) end
+DBG(381200)> CPU DETAIL: IRQ=000c 00000000
+DBG(381203)> CPU CMD: TIO 00c 00c 00 0 e00 cc=1d
+DBG(110251997)> same as above (36623598 times)
+DBG(110252000)> INQ CMD: 0: error 0
+DBG(110252000)> INQ CMD: 0: setattn 1f
+DBG(110252000)> CPU EXP: set_devattn(1f, 80) ffff

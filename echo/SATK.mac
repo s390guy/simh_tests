@@ -1,0 +1,33 @@
+.* Copyright (C) 2021 Harold Grovesteen
+.*
+.* This file is part of SATK.
+.*
+.*     SATK is free software: you can redistribute it and/or modify
+.*     it under the terms of the GNU General Public License as published by
+.*     the Free Software Foundation, either version 3 of the License, or
+.*     (at your option) any later version.
+.*
+.*     SATK is distributed in the hope that it will be useful,
+.*     but WITHOUT ANY WARRANTY; without even the implied warranty of
+.*     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+.*     GNU General Public License for more details.
+.*
+.*     You should have received a copy of the GNU General Public License
+.*     along with SATK.  If not, see <http://www.gnu.org/licenses/>.
+
+         MACRO
+         SATK  &EXEC=HERC
+.* When included this macro informs other local macros to use SATK,
+.* and which execution environment will be used.  SATK provides tools
+.* for creating stand alone programs.  SATK includes an assembler, IPL
+.* medium creation, and various other capabilities.
+.*
+.* When the macro is omitted the program does not use SATK facilities.
+.* SATK provides tools for creating stand alone programs.  It
+.* includes an assembler, IPL medium creation, and various other
+.* capabilities.
+         GBLB  &SATK     Whether SATK is in use or not
+         GBLC  &SATKEXC  Expected execution environment
+&SATK    SETC  1         SATK used by this program
+&SATKEXC SETC  '&EXEC'   Expected execution environment
+         MEND
