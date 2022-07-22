@@ -42,7 +42,9 @@
 * Target Architecture: S/360
 *
 * This is a special test version that uses SLI in write CCW's to debug
-* a console condition.
+* a console condition and initial tests until the IPL card reader becomes
+* available.  Some S/360 models require both, some do not.  No harm if
+* these features are not required.
 *
 * Devices Used:
 *   01F - Console device
@@ -112,6 +114,17 @@ PGMSECT  START X'2000',ECHOSLI  Start a second region for the program itself
          USING ASA,0           Give me instruction access to the ASA CSECT
 PGMSTART BALR  R12,0           Establish my base register
          USING *,R12           Tell the assembler
+         SPACE 3
+* Wait for IPL device to complete its I/O operation
+* Some S/360 models require this, some do not.
+         LH    R1,IPLPSW+2      Load the address of the IPL device
+IPLEND   DS    0H               Loop until the IPL device is available
+         TIO   0(R1)            Is the IPL device now available?
+         BC    B'0001',DEVNOAVL ..No, CC=3 Not operational (quit)
+         BC    B'0010',IPLEND   ..No, CC=2 card reader is still busy
+         BC    B'0100',IPLEND   ..No, CC=1 CSW stored (close but no cigar)
+*  CC=0, means the IPL device is now available
+*  Clean up of I/O status from IPL is now complete, proceed with echo test
          SPACE 3
 * Determine if the console device, subchannel and channel are ready for use.
          LH    R1,CONDEV   Console device address in I/O inst. register
